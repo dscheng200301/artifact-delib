@@ -1,0 +1,3 @@
+provider: mock
+allow_paid_calls: false
+model: deterministic-fixture-model

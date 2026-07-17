@@ -1,0 +1,3 @@
+name: histodelib_api_router
+router: api
+max_cross_exam_rounds: 2

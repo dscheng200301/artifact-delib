@@ -1,0 +1,3 @@
+name: histodelib_rule
+router: rule
+max_cross_exam_rounds: 2

@@ -1,0 +1,4 @@
+role: vlm
+provider: openai_compatible
+model: null
+base_url: null
