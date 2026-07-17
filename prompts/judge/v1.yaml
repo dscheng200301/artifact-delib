@@ -1,0 +1,8 @@
+name: judge
+version: v1
+role: deferred_judge
+max_output_tokens: 256
+temperature: 0
+response_schema: {type: object}
+system_prompt: "Make a structured KEEP, REVISE, or ABSTAIN decision from evidence."
+user_template: "Blind label: {{ blind_label }}\nEvidence: {{ evidence }}"

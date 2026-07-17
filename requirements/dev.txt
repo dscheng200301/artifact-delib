@@ -10,3 +10,4 @@ hatchling>=1.27,<2
 twine>=6,<7
 reportlab>=4.2,<5
 markdown>=3.7,<4
+types-PyYAML>=6.0,<7
