@@ -26,16 +26,22 @@ class AgentEvidence:
 class TextAgent:
     """Send only caption text to the configured LLM client."""
 
-    def __init__(self, client: ModelClient, prompt: PromptSpec | None = None) -> None:
+    def __init__(
+        self,
+        client: ModelClient,
+        prompt: PromptSpec | None = None,
+        model_name: str = DEFAULT_MODEL,
+    ) -> None:
         self.client = client
         self.prompt = prompt or _load_default_prompt("text_agent")
+        self.model_name = model_name
 
     def analyze(self, caption: str) -> AgentEvidence:
         rendered = self.prompt.render({"caption": caption}) if self.prompt else None
         response = self.client.generate(
             ModelRequest(
                 request_id=str(uuid.uuid4()),
-                model=DEFAULT_MODEL,
+                model=self.model_name,
                 system_prompt=(
                     rendered.system_prompt
                     if rendered
@@ -54,9 +60,15 @@ class TextAgent:
 class ImageAgent:
     """Send only a local image payload to the configured VLM client."""
 
-    def __init__(self, client: ModelClient, prompt: PromptSpec | None = None) -> None:
+    def __init__(
+        self,
+        client: ModelClient,
+        prompt: PromptSpec | None = None,
+        model_name: str = DEFAULT_MODEL,
+    ) -> None:
         self.client = client
         self.prompt = prompt or _load_default_prompt("image_agent")
+        self.model_name = model_name
 
     def analyze(self, image_path: Path) -> AgentEvidence:
         encoded = base64.b64encode(image_path.read_bytes()).decode("ascii")
@@ -64,7 +76,7 @@ class ImageAgent:
         response = self.client.generate(
             ModelRequest(
                 request_id=str(uuid.uuid4()),
-                model=DEFAULT_MODEL,
+                model=self.model_name,
                 system_prompt=(
                     rendered.system_prompt
                     if rendered

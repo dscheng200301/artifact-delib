@@ -11,6 +11,7 @@ import typer
 from histodelib.api.budget import BudgetManager
 from histodelib.api.cache import ResponseCache
 from histodelib.api.call_log import CallLogStore
+from histodelib.api.factory import build_remote_client, selected_model
 from histodelib.api.guarded import GuardedModelClient
 from histodelib.api.mock import MockModelClient
 from histodelib.config import load_config
@@ -94,40 +95,66 @@ def report_run(run_id: str, output_root: Path = typer.Option(Path("outputs"))) -
 def run(
     method: str = typer.Option("histodelib_rule"),
     config: str = typer.Option("fixture"),
+    mode: str = typer.Option("fixture", help="fixture or api"),
     output_root: Path = typer.Option(Path("outputs")),
     allow_paid_calls: bool = typer.Option(False),
 ) -> None:
-    """Run the deterministic mock path; remote calls require future explicit configuration."""
+    """Run synthetic fixtures through mock or explicitly authorized remote API clients."""
 
-    if allow_paid_calls:
-        raise typer.BadParameter(
-            "real API smoke runs are intentionally not implemented in fixture mode"
-        )
+    if mode not in {"fixture", "api"}:
+        raise typer.BadParameter("mode must be fixture or api")
     if method not in BASELINE_NAMES:
         raise typer.BadParameter(f"unsupported fixture method: {method}")
     samples = build_fixture(Path("data/fixtures"))
     config_path = Path(config)
-    resolved_config = (
+    run_config = (
         load_config(config_path)
         if config_path.exists()
         else {"name": config, "mode": "fixture", "synthetic_only": True}
     )
+    method_config_path = Path("configs/method") / f"{method}.yaml"
+    method_config = load_config(method_config_path) if method_config_path.exists() else {}
+    resolved_config = {**method_config, **run_config}
     config_name = str(resolved_config.get("name", config_path.stem or config))
     safe_config_name = re.sub(r"[^A-Za-z0-9_.-]+", "-", config_name).strip("-") or "fixture"
-    run_id = f"{method}-{safe_config_name}-synthetic"
     settings = Settings()
-    guarded_client = GuardedModelClient(
-        MockModelClient(role="vlm"),
-        cache=ResponseCache(output_root / run_id / "cache"),
-        budget=BudgetManager(
-            max_requests=settings.api_max_total_requests,
-            max_tokens=settings.api_max_total_tokens,
-            max_cost=settings.api_max_estimated_cost,
-        ),
-        call_log=CallLogStore(output_root / run_id / "call_log.jsonl"),
-        max_retries=settings.api_max_retries,
+    model_name = str(resolved_config.get("model") or selected_model(settings))
+    if mode == "fixture":
+        if allow_paid_calls:
+            raise typer.BadParameter("use --mode api for remote calls")
+        run_id = f"{method}-{safe_config_name}-synthetic"
+        guarded_client = GuardedModelClient(
+            MockModelClient(role="vlm"),
+            cache=ResponseCache(output_root / run_id / "cache"),
+            budget=BudgetManager(
+                max_requests=settings.api_max_total_requests,
+                max_tokens=settings.api_max_total_tokens,
+                max_cost=settings.api_max_estimated_cost,
+            ),
+            call_log=CallLogStore(output_root / run_id / "call_log.jsonl"),
+            max_retries=settings.api_max_retries,
+        )
+    else:
+        if allow_paid_calls:
+            settings = settings.model_copy(update={"api_allow_paid_calls": True})
+        if not settings.api_allow_paid_calls:
+            raise typer.BadParameter("set API_ALLOW_PAID_CALLS=true before an API run")
+        run_id = f"{method}-{safe_config_name}-api-synthetic"
+        guarded_client = build_remote_client(settings, output_root / run_id)
+        resolved_config = {
+            **resolved_config,
+            "mode": "api",
+            "synthetic_only": True,
+            "enable_api_deliberation": True,
+        }
+    baseline = create_baseline(
+        method,
+        guarded_client,
+        model_name=model_name,
+        enable_api_deliberation=bool(resolved_config.get("enable_api_deliberation", False)),
+        max_reinspection_targets=int(resolved_config.get("max_reinspection_targets", 2)),
+        max_cross_exam_rounds=int(resolved_config.get("max_cross_exam_rounds", 2)),
     )
-    baseline = create_baseline(method, guarded_client)
     summary = RunManager(output_root).run(
         samples, baseline, run_id=run_id, resolved_config=resolved_config
     )

@@ -25,12 +25,12 @@ class Settings(BaseSettings):
     histodelib_cache_root: Path = Path(".cache/histodelib")
 
     llm_api_key: str | None = None
-    llm_base_url: str | None = None
-    llm_model: str | None = "qwen3.5-flash"
+    llm_base_url: str | None = "https://dashscope.aliyuncs.com/compatible-mode/v1"
+    llm_model: str | None = "qwen3.5-flash-2026-02-23"
     llm_provider: str = "openai_compatible"
     vlm_api_key: str | None = None
-    vlm_base_url: str | None = None
-    vlm_model: str | None = "qwen3.5-flash"
+    vlm_base_url: str | None = "https://dashscope.aliyuncs.com/compatible-mode/v1"
+    vlm_model: str | None = "qwen3.5-flash-2026-02-23"
     vlm_provider: str = "openai_compatible"
     judge_api_key: str | None = None
     judge_base_url: str | None = None

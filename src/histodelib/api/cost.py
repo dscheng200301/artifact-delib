@@ -3,6 +3,21 @@
 from __future__ import annotations
 
 from decimal import Decimal
+from pathlib import Path
+from typing import Any
+
+import yaml  # type: ignore[import-untyped]
+
+
+def load_pricing(path: str | Path, model: str) -> dict[str, Any]:
+    """Load one model's local pricing entry, preserving the currency metadata."""
+
+    values = yaml.safe_load(Path(path).read_text(encoding="utf-8")) or {}
+    models = values.get("models", {}) if isinstance(values, dict) else {}
+    entry = models.get(model, {}) if isinstance(models, dict) else {}
+    if not isinstance(entry, dict):
+        entry = {}
+    return {"currency": values.get("currency", "USD"), **entry}
 
 
 def estimate_cost(

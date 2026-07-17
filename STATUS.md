@@ -1,4 +1,4 @@
-# HistoDelib Project Status
+﻿# HistoDelib Project Status
 
 ## Project Version
 
@@ -21,7 +21,9 @@ Existing `histo-delib`; no environment was created. The editable package install
 - Versioned YAML prompts are loaded and hashed by the modality-isolated agents.
 - Guarded client is now wired into fixture runs for cache hits/misses, conservative pre-call budgets, retries, and redacted call logs; YAML run configs are persisted as resolved artifacts.
 - Fixture builder creates 12 synthetic samples (four per class); API-router call counts include the router request per sample.
-- The default model configuration is now `qwen3.5-flash` across text, image, router, judge, and baseline requests.
+- The default model configuration is now the fixed `qwen3.5-flash-2026-02-23` snapshot across text, image, router, judge, and baseline requests; DashScope OpenAI-compatible endpoints and a CNY pricing example are recorded.
+- Remote-client construction is fail-closed and guarded by cache, retries, budgets, redacted call logs, and an explicit paid-call gate; API reinspection, cross-examination, and deferred-judge paths are bounded and tested.
+- Named baselines now declare modality payloads and call schedules; method/run YAML values drive model and deliberation limits into execution.
 - Mock smoke run generated only synthetic-labelled artifacts; the paper-writing specification was rendered to a four-page PDF and visually inspected.
 
 ## In Progress
@@ -34,7 +36,7 @@ Existing `histo-delib`; no environment was created. The editable package install
 
 ## Tests
 
-- 54 passed; Ruff, mypy and pip check passed in `histo-delib`.
+- 66 passed; Ruff, mypy and pip check passed in `histo-delib`.
 
 ## Mock Smoke Test
 
@@ -62,7 +64,7 @@ Existing `histo-delib`; no environment was created. The editable package install
 
 ## Current Git Commit
 
-- `40c600c` (qwen3.5-flash model default integration)
+- Latest commit: `feat: complete guarded qwen deliberation runtime`.
 
 ## Next Executable Step
 

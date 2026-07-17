@@ -87,6 +87,27 @@ def test_histodelib_rule_runs_on_synthetic_fixture(tmp_path: Path) -> None:
     assert "cross_exam_rounds" in prediction.evidence
 
 
+def test_histodelib_api_deliberation_adds_bounded_followup_calls(tmp_path: Path) -> None:
+    sample = next(
+        sample for sample in build_fixture(tmp_path) if sample.label is Label.MISCAPTIONED
+    )
+    method = HistoDelibMethod(
+        client=MockModelClient(role="vlm"),
+        router=RuleRouter(),
+        enable_api_deliberation=True,
+        max_reinspection_targets=1,
+        max_cross_exam_rounds=1,
+        model_name="custom-model",
+    )
+
+    prediction = method.run(sample)
+
+    assert prediction.api_calls >= 4
+    assert prediction.evidence["reinspection_api_calls"] <= 1
+    assert prediction.evidence["cross_exam_api_calls"] <= 1
+    assert prediction.evidence["judge_api_calls"] == 1
+
+
 def test_text_and_image_agents_keep_inputs_isolated(tmp_path: Path) -> None:
     class RecordingClient(MockModelClient):
         def __init__(self) -> None:
@@ -108,11 +129,30 @@ def test_text_and_image_agents_keep_inputs_isolated(tmp_path: Path) -> None:
     )
 
     assert client.requests[0].image_base64 is None
-    assert client.requests[0].model == "qwen3.5-flash"
+    assert client.requests[0].model == "qwen3.5-flash-2026-02-23"
     assert "caption only" in client.requests[0].user_prompt
     assert client.requests[1].image_base64 is not None
-    assert client.requests[1].model == "qwen3.5-flash"
+    assert client.requests[1].model == "qwen3.5-flash-2026-02-23"
     assert "caption only" not in client.requests[1].user_prompt
+
+
+def test_agents_use_explicit_model_name(tmp_path: Path) -> None:
+    image_path = build_fixture(tmp_path)[0].image_path
+    class RecordingClient(MockModelClient):
+        def __init__(self) -> None:
+            super().__init__(role="agent")
+            self.requests = []
+
+        def generate(self, request):
+            self.requests.append(request)
+            return super().generate(request)
+
+    client = RecordingClient()
+
+    TextAgent(client, model_name="custom-model").analyze("caption")
+    ImageAgent(client, model_name="custom-model").analyze(image_path)
+
+    assert [request.model for request in client.requests] == ["custom-model", "custom-model"]
 
 
 def test_probe_reinspection_and_cross_exam_are_bounded() -> None:
@@ -127,6 +167,58 @@ def test_probe_reinspection_and_cross_exam_are_bounded() -> None:
     assert decision.targets
     assert result.rounds <= 2
     assert result.stop_reason in {"stable", "max_rounds", "abstain"}
+
+
+def test_reinspection_api_calls_are_bounded_and_image_only(tmp_path: Path) -> None:
+    sample = build_fixture(tmp_path)[0]
+
+    class RecordingClient(MockModelClient):
+        def __init__(self) -> None:
+            super().__init__(role="reinspect")
+            self.requests = []
+
+        def generate(self, request):
+            self.requests.append(request)
+            return super().generate(request)
+
+    client = RecordingClient()
+    decision = TargetedReinspection().select(
+        LightRelationProbe().assess(
+            {"label": "TRUE", "claims": ["caption"]}, {"label": "MISCAPTIONED"}
+        )
+    )
+    result = TargetedReinspection().inspect(
+        client, sample, decision, model_name="custom-model", max_targets=1
+    )
+
+    assert result.api_calls == 1
+    assert client.requests[0].image_base64 is not None
+    assert client.requests[0].model == "custom-model"
+
+
+def test_cross_exam_api_rounds_respect_maximum(tmp_path: Path) -> None:
+    probe = LightRelationProbe().assess(
+        {"label": "TRUE", "claims": ["caption"]}, {"label": "MISCAPTIONED"}
+    )
+    decision = TargetedReinspection().select(probe)
+
+    result = ControlledCrossExamination(max_rounds=2).run_with_client(
+        MockModelClient(role="critic"), probe, decision, model_name="custom-model"
+    )
+
+    assert 0 <= result.api_calls <= 2
+
+
+def test_deferred_judge_api_path_returns_structured_decision() -> None:
+    result = DeferredJudge().adjudicate_with_client(
+        MockModelClient(role="judge"),
+        blind_label=Label.TRUE,
+        evidence={"text_label": "MISCAPTIONED", "image_label": "MISCAPTIONED"},
+        model_name="custom-model",
+    )
+
+    assert result.final_label is Label.MISCAPTIONED
+    assert result.decision in {"KEEP", "REVISE", "ABSTAIN"}
 
 
 def test_baseline_factory_exposes_named_api_only_protocols(tmp_path: Path) -> None:
@@ -147,3 +239,47 @@ def test_baseline_factory_exposes_named_api_only_protocols(tmp_path: Path) -> No
     assert (
         create_baseline("generic_mad", MockModelClient(role="baseline")).run(sample).api_calls == 4
     )
+
+
+def test_baseline_factory_passes_configured_model_name(tmp_path: Path) -> None:
+    sample = build_fixture(tmp_path)[0]
+
+    class RecordingClient(MockModelClient):
+        def __init__(self) -> None:
+            super().__init__(role="baseline")
+            self.requests = []
+
+        def generate(self, request):
+            self.requests.append(request)
+            return super().generate(request)
+
+    client = RecordingClient()
+    create_baseline("direct_vlm", client, model_name="custom-model").run(sample)
+
+    assert client.requests[0].model == "custom-model"
+
+
+def test_baseline_protocols_use_declared_modalities(tmp_path: Path) -> None:
+    sample = build_fixture(tmp_path)[0]
+
+    class RecordingClient(MockModelClient):
+        def __init__(self) -> None:
+            super().__init__(role="baseline")
+            self.requests = []
+
+        def generate(self, request):
+            self.requests.append(request)
+            return super().generate(request)
+
+    text_client = RecordingClient()
+    create_baseline("text_only", text_client).run(sample)
+    assert text_client.requests[0].image_base64 is None
+
+    image_client = RecordingClient()
+    create_baseline("image_only", image_client).run(sample)
+    assert image_client.requests[0].image_base64 is not None
+
+    direct_client = RecordingClient()
+    create_baseline("direct_vlm", direct_client).run(sample)
+    assert direct_client.requests[0].image_base64 is not None
+    assert sample.caption in direct_client.requests[0].user_prompt

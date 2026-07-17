@@ -1,5 +1,5 @@
 provider: openai_compatible
-model: qwen3.5-flash
+model: qwen3.5-flash-2026-02-23
 timeout_seconds: 120
 max_retries: 5
 max_concurrency: 2

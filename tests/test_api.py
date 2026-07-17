@@ -10,7 +10,7 @@ from histodelib.api.audited import AuditedModelClient
 from histodelib.api.budget import BudgetExceeded, BudgetManager
 from histodelib.api.cache import ResponseCache
 from histodelib.api.call_log import CallLogStore, redact_secrets
-from histodelib.api.cost import estimate_cost
+from histodelib.api.cost import estimate_cost, load_pricing
 from histodelib.api.guarded import GuardedModelClient
 from histodelib.api.mock import MockModelClient
 from histodelib.api.openai_compatible import OpenAICompatibleClient
@@ -131,6 +131,13 @@ def test_call_log_redacts_authorization_and_cost_is_optional(tmp_path) -> None:
     assert "secret" not in (tmp_path / "calls.jsonl").read_text(encoding="utf-8")
     assert estimate_cost(1000, 500, {"input_per_million": 1.0, "output_per_million": 2.0}) == 0.002
     assert estimate_cost(1000, 500, None) is None
+
+
+def test_qwen_pricing_example_is_loadable() -> None:
+    pricing = load_pricing("configs/api/pricing.example.yaml", "qwen3.5-flash-2026-02-23")
+    assert pricing["currency"] == "CNY"
+    assert pricing["input_per_million"] == 0.2
+    assert pricing["output_per_million"] == 2.0
 
 
 def test_audited_client_records_usage_latency_and_cost(tmp_path) -> None:

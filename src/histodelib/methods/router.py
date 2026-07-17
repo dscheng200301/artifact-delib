@@ -53,8 +53,9 @@ class RuleRouter:
 class ApiRouter:
     """Use a short API probe, then validate it against the rule route."""
 
-    def __init__(self, client: ModelClient) -> None:
+    def __init__(self, client: ModelClient, model_name: str = DEFAULT_MODEL) -> None:
         self.client = client
+        self.model_name = model_name
         self.rule_router = RuleRouter()
         self.api_calls = 0
         self.last_api_calls = 0
@@ -65,7 +66,7 @@ class ApiRouter:
         response = self.client.generate(
             ModelRequest(
                 request_id="router-probe",
-                model=DEFAULT_MODEL,
+                model=self.model_name,
                 system_prompt="Return only a concise routing JSON object.",
                 user_prompt=str(probe),
             )
