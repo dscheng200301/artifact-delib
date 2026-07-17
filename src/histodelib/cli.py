@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import json
 import shutil
 from pathlib import Path
 
@@ -12,15 +11,18 @@ from histodelib.api.mock import MockModelClient
 from histodelib.data.fixture_builder import build_fixture
 from histodelib.data.importer import import_manifest
 from histodelib.data.validator import validate_samples
-from histodelib.methods.histodelib import HistoDelibMethod
-from histodelib.methods.router import RuleRouter
+from histodelib.methods.baselines import BASELINE_NAMES, create_baseline
+from histodelib.reporting import write_run_report
+from histodelib.runner.run_manager import RunManager
 from histodelib.settings import Settings
 
 app = typer.Typer(help="HistoDelib API-only engineering commands.", no_args_is_help=True)
 fixture_app = typer.Typer(help="Build and validate synthetic test fixtures.")
 data_app = typer.Typer(help="Validate local dataset manifests without downloading data.")
+report_app = typer.Typer(help="Render reports from structured run artifacts.")
 app.add_typer(fixture_app, name="fixture")
 app.add_typer(data_app, name="data")
+app.add_typer(report_app, name="report")
 
 
 @app.command()
@@ -58,9 +60,7 @@ def fixture_validate(root: Path = typer.Option(Path("data/fixtures"))) -> None:
 
 
 @data_app.command("import")
-def data_import(
-    manifest: Path = typer.Option(...), image_root: Path = typer.Option(...)
-) -> None:
+def data_import(manifest: Path = typer.Option(...), image_root: Path = typer.Option(...)) -> None:
     """Import and validate a user-provided local manifest."""
 
     samples = import_manifest(manifest, image_root)
@@ -71,6 +71,17 @@ def data_import(
         raise typer.Exit(code=1)
     typer.echo(f"imported {len(samples)} samples")
     typer.echo("formal dataset remains NOT_SELECTED until explicitly authorized")
+
+
+@report_app.command("run")
+def report_run(run_id: str, output_root: Path = typer.Option(Path("outputs"))) -> None:
+    """Render a report from an existing structured run directory."""
+
+    run_dir = output_root / run_id
+    if not (run_dir / "predictions.jsonl").exists():
+        raise typer.BadParameter(f"run artifacts not found: {run_dir}")
+    report_path = write_run_report(run_dir)
+    typer.echo(f"report written: {report_path}")
 
 
 @app.command()
@@ -86,17 +97,13 @@ def run(
         raise typer.BadParameter(
             "real API smoke runs are intentionally not implemented in fixture mode"
         )
-    if method not in {"histodelib_rule", "histodelib_api_router", "direct_vlm", "always_full"}:
+    if method not in BASELINE_NAMES:
         raise typer.BadParameter(f"unsupported fixture method: {method}")
     samples = build_fixture(Path("data/fixtures"))
-    runner = HistoDelibMethod(client=MockModelClient(role="vlm"), router=RuleRouter())
-    predictions = [runner.run(sample).model_dump(mode="json") for sample in samples]
-    run_dir = output_root / f"{method}-{config}-synthetic"
-    run_dir.mkdir(parents=True, exist_ok=True)
-    (run_dir / "predictions.jsonl").write_text(
-        "\n".join(json.dumps(item, ensure_ascii=False) for item in predictions) + "\n",
-        encoding="utf-8",
-    )
+    baseline = create_baseline(method, MockModelClient(role="vlm"))
+    run_id = f"{method}-{config}-synthetic"
+    summary = RunManager(output_root).run(samples, baseline, run_id=run_id)
+    run_dir = summary.run_dir
     (run_dir / "README.txt").write_text(
         "SYNTHETIC_FIXTURE\nNOT_FOR_RESEARCH_RESULTS\n",
         encoding="utf-8",
