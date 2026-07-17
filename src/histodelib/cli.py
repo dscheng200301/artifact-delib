@@ -2,14 +2,18 @@
 
 from __future__ import annotations
 
+import re
 import shutil
 from pathlib import Path
 
 import typer
 
-from histodelib.api.audited import AuditedModelClient
+from histodelib.api.budget import BudgetManager
+from histodelib.api.cache import ResponseCache
 from histodelib.api.call_log import CallLogStore
+from histodelib.api.guarded import GuardedModelClient
 from histodelib.api.mock import MockModelClient
+from histodelib.config import load_config
 from histodelib.data.fixture_builder import build_fixture
 from histodelib.data.importer import import_manifest
 from histodelib.data.validator import validate_samples
@@ -102,13 +106,31 @@ def run(
     if method not in BASELINE_NAMES:
         raise typer.BadParameter(f"unsupported fixture method: {method}")
     samples = build_fixture(Path("data/fixtures"))
-    run_id = f"{method}-{config}-synthetic"
-    audited_client = AuditedModelClient(
-        MockModelClient(role="vlm"),
-        CallLogStore(output_root / run_id / "call_log.jsonl"),
+    config_path = Path(config)
+    resolved_config = (
+        load_config(config_path)
+        if config_path.exists()
+        else {"name": config, "mode": "fixture", "synthetic_only": True}
     )
-    baseline = create_baseline(method, audited_client)
-    summary = RunManager(output_root).run(samples, baseline, run_id=run_id)
+    config_name = str(resolved_config.get("name", config_path.stem or config))
+    safe_config_name = re.sub(r"[^A-Za-z0-9_.-]+", "-", config_name).strip("-") or "fixture"
+    run_id = f"{method}-{safe_config_name}-synthetic"
+    settings = Settings()
+    guarded_client = GuardedModelClient(
+        MockModelClient(role="vlm"),
+        cache=ResponseCache(output_root / run_id / "cache"),
+        budget=BudgetManager(
+            max_requests=settings.api_max_total_requests,
+            max_tokens=settings.api_max_total_tokens,
+            max_cost=settings.api_max_estimated_cost,
+        ),
+        call_log=CallLogStore(output_root / run_id / "call_log.jsonl"),
+        max_retries=settings.api_max_retries,
+    )
+    baseline = create_baseline(method, guarded_client)
+    summary = RunManager(output_root).run(
+        samples, baseline, run_id=run_id, resolved_config=resolved_config
+    )
     run_dir = summary.run_dir
     (run_dir / "README.txt").write_text(
         "SYNTHETIC_FIXTURE\nNOT_FOR_RESEARCH_RESULTS\n",

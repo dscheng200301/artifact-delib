@@ -33,11 +33,28 @@ def test_run_manager_writes_structured_artifacts_and_resumes(tmp_path: Path) -> 
     second = manager.run(samples, method, run_id="fixture-run")
     run_dir = tmp_path / "outputs" / "fixture-run"
 
-    assert first.completed_samples == 3
-    assert second.completed_samples == 3
-    assert method.calls == 3
+    assert first.completed_samples == len(samples)
+    assert second.completed_samples == len(samples)
+    assert method.calls == len(samples)
     assert (run_dir / "config.resolved.yaml").exists()
     assert (run_dir / "predictions.jsonl").exists()
     assert (
         json.loads((run_dir / "run_metadata.json").read_text(encoding="utf-8"))["mode"] == "fixture"
     )
+
+
+def test_run_manager_persists_resolved_config(tmp_path: Path) -> None:
+    samples = build_fixture(tmp_path / "fixtures")
+    manager = RunManager(tmp_path / "outputs")
+
+    manager.run(
+        samples[:1],
+        CountingMethod(),
+        run_id="configured-run",
+        resolved_config={"name": "fixture", "max_cross_exam_rounds": 2},
+    )
+
+    content = (tmp_path / "outputs" / "configured-run" / "config.resolved.yaml").read_text(
+        encoding="utf-8"
+    )
+    assert "max_cross_exam_rounds: 2" in content

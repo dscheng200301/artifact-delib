@@ -7,6 +7,8 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Protocol
 
+import yaml  # type: ignore[import-untyped]
+
 from histodelib.schemas import Prediction, Sample
 
 
@@ -29,7 +31,13 @@ class RunManager:
     def __init__(self, output_root: Path) -> None:
         self.output_root = output_root
 
-    def run(self, samples: list[Sample], method: Runnable, run_id: str) -> RunSummary:
+    def run(
+        self,
+        samples: list[Sample],
+        method: Runnable,
+        run_id: str,
+        resolved_config: dict[str, object] | None = None,
+    ) -> RunSummary:
         run_dir = self.output_root / run_id
         run_dir.mkdir(parents=True, exist_ok=True)
         prediction_path = run_dir / "predictions.jsonl"
@@ -46,8 +54,14 @@ class RunManager:
                 prediction = method.run(sample)
                 handle.write(prediction.model_dump_json() + "\n")
                 existing[sample.sample_id] = prediction
+        config = {
+            "mode": "fixture",
+            "synthetic_only": True,
+            "formal_experiment": "NOT_RUN",
+            **(resolved_config or {}),
+        }
         (run_dir / "config.resolved.yaml").write_text(
-            "mode: fixture\nsynthetic_only: true\nformal_experiment: NOT_RUN\n",
+            yaml.safe_dump(config, sort_keys=False, allow_unicode=True),
             encoding="utf-8",
         )
         (run_dir / "run_metadata.json").write_text(
@@ -58,6 +72,7 @@ class RunManager:
                     "formal_dataset": "NOT_SELECTED",
                     "formal_experiment": "NOT_RUN",
                     "prediction_count": len(existing),
+                    "resolved_config": config,
                 },
                 indent=2,
             ),

@@ -17,18 +17,57 @@ def build_fixture(root: Path) -> list[Sample]:
     image_dir = root / "images"
     image_dir.mkdir(parents=True, exist_ok=True)
     definitions = (
-        ("fixture-true", Label.TRUE, "Synthetic 1912 harbor photograph", "1912 HARBOR"),
+        ("fixture-true-1", Label.TRUE, "Synthetic 1912 harbor photograph", "1912 HARBOR"),
+        ("fixture-true-2", Label.TRUE, "Synthetic 1920 harbor photograph", "1920 HARBOR"),
+        ("fixture-true-3", Label.TRUE, "Synthetic 1930 station photograph", "1930 STATION"),
+        ("fixture-true-4", Label.TRUE, "Synthetic 1940 square photograph", "1940 SQUARE"),
         (
-            "fixture-miscaptioned",
+            "fixture-miscaptioned-1",
             Label.MISCAPTIONED,
             "Synthetic 1913 harbor photograph",
             "1912 HARBOR",
         ),
         (
-            "fixture-ooc",
+            "fixture-miscaptioned-2",
+            Label.MISCAPTIONED,
+            "Synthetic 1921 harbor photograph",
+            "1920 HARBOR",
+        ),
+        (
+            "fixture-miscaptioned-3",
+            Label.MISCAPTIONED,
+            "Synthetic 1931 station photograph",
+            "1930 STATION",
+        ),
+        (
+            "fixture-miscaptioned-4",
+            Label.MISCAPTIONED,
+            "Synthetic 1941 square photograph",
+            "1940 SQUARE",
+        ),
+        (
+            "fixture-ooc-1",
             Label.OUT_OF_CONTEXT,
             "Synthetic mountain expedition photograph",
             "1912 HARBOR",
+        ),
+        (
+            "fixture-ooc-2",
+            Label.OUT_OF_CONTEXT,
+            "Synthetic mountain camp photograph",
+            "1920 HARBOR",
+        ),
+        (
+            "fixture-ooc-3",
+            Label.OUT_OF_CONTEXT,
+            "Synthetic mountain trail photograph",
+            "1930 STATION",
+        ),
+        (
+            "fixture-ooc-4",
+            Label.OUT_OF_CONTEXT,
+            "Synthetic mountain ridge photograph",
+            "1940 SQUARE",
         ),
     )
     samples: list[Sample] = []
@@ -47,6 +86,7 @@ def build_fixture(root: Path) -> list[Sample]:
                 label=label,
                 original_group_id=sample_id,
                 source="synthetic fixture builder",
+                split="fixture",
                 fixture_markers=set(_MARKERS),
             )
         )

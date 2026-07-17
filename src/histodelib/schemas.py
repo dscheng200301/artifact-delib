@@ -45,7 +45,7 @@ class Sample(BaseModel):
     license: str | None = None
     domain: str | None = None
     conflict_type: str | None = None
-    split: Literal["train", "validation", "test"] | None = None
+    split: Literal["train", "validation", "test", "fixture", "unassigned"] | None = None
     fixture_markers: set[str] = Field(default_factory=set)
 
     @field_validator("caption")

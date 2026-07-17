@@ -14,9 +14,21 @@ def test_fixture_builder_creates_labelled_synthetic_images(tmp_path: Path) -> No
     samples = build_fixture(tmp_path)
 
     assert {sample.label for sample in samples} == set(Label)
+    assert len(samples) >= 10
     assert all(sample.image_path.exists() for sample in samples)
     assert all(sample.is_synthetic_fixture for sample in samples)
     assert validate_samples(samples).is_valid is True
+
+
+def test_sample_supports_fixture_and_unassigned_splits(tmp_path: Path) -> None:
+    sample = Sample(
+        sample_id="unassigned",
+        image_path=tmp_path / "sample.png",
+        caption="caption",
+        split="fixture",
+    )
+    assert sample.split == "fixture"
+    assert sample.model_copy(update={"split": "unassigned"}).split == "unassigned"
 
 
 def test_validator_rejects_duplicate_ids_and_missing_images(tmp_path: Path) -> None:

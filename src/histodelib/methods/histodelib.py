@@ -44,8 +44,16 @@ class HistoDelibMethod:
             {"text_label": text_label, "image_label": image_label},
         )
         usage = TokenUsage(
-            input_tokens=text_evidence.usage.input_tokens + image_evidence.usage.input_tokens,
-            output_tokens=text_evidence.usage.output_tokens + image_evidence.usage.output_tokens,
+            input_tokens=(
+                text_evidence.usage.input_tokens
+                + image_evidence.usage.input_tokens
+                + getattr(self.router, "last_usage", TokenUsage()).input_tokens
+            ),
+            output_tokens=(
+                text_evidence.usage.output_tokens
+                + image_evidence.usage.output_tokens
+                + getattr(self.router, "last_usage", TokenUsage()).output_tokens
+            ),
         )
         return Prediction(
             sample_id=sample.sample_id,
@@ -64,5 +72,9 @@ class HistoDelibMethod:
                 "judge_decision": judged.decision,
             },
             usage=usage,
-            api_calls=2,
+            api_calls=2 + getattr(
+                self.router,
+                "last_api_calls",
+                getattr(self.router, "api_calls", 0),
+            ),
         )

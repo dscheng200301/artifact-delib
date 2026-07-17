@@ -34,6 +34,31 @@ def test_api_router_returns_schema_validated_route() -> None:
     assert decision.reason.startswith("api:")
 
 
+def test_histodelib_api_router_counts_router_call(tmp_path: Path) -> None:
+    sample = build_fixture(tmp_path)[0]
+    method = HistoDelibMethod(
+        client=MockModelClient(role="vlm"),
+        router=ApiRouter(client=MockModelClient(role="router")),
+        method_name="histodelib_api_router",
+    )
+
+    prediction = method.run(sample)
+
+    assert prediction.api_calls == 3
+
+
+def test_histodelib_api_router_call_count_is_per_sample(tmp_path: Path) -> None:
+    samples = build_fixture(tmp_path)
+    router = ApiRouter(client=MockModelClient(role="router"))
+    method = HistoDelibMethod(
+        client=MockModelClient(role="vlm"), router=router, method_name="histodelib_api_router"
+    )
+
+    predictions = [method.run(sample) for sample in samples[:2]]
+
+    assert [prediction.api_calls for prediction in predictions] == [3, 3]
+
+
 def test_deferred_judge_can_keep_or_revise_blind_label() -> None:
     judge = DeferredJudge()
 
@@ -48,7 +73,9 @@ def test_deferred_judge_can_keep_or_revise_blind_label() -> None:
 
 
 def test_histodelib_rule_runs_on_synthetic_fixture(tmp_path: Path) -> None:
-    sample = build_fixture(tmp_path)[1]
+    sample = next(
+        sample for sample in build_fixture(tmp_path) if sample.label is Label.MISCAPTIONED
+    )
     method = HistoDelibMethod(client=MockModelClient(role="vlm"), router=RuleRouter())
 
     prediction = method.run(sample)

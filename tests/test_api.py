@@ -11,6 +11,7 @@ from histodelib.api.budget import BudgetExceeded, BudgetManager
 from histodelib.api.cache import ResponseCache
 from histodelib.api.call_log import CallLogStore, redact_secrets
 from histodelib.api.cost import estimate_cost
+from histodelib.api.guarded import GuardedModelClient
 from histodelib.api.mock import MockModelClient
 from histodelib.api.openai_compatible import OpenAICompatibleClient
 from histodelib.api.response_parser import StructuredResponseError, parse_json_object
@@ -153,3 +154,71 @@ def test_audited_client_records_usage_latency_and_cost(tmp_path) -> None:
     assert record["cache_state"] == "disabled"
     assert record["estimated_cost"] is not None
     assert record["latency_ms"] == response.latency_ms
+
+
+def test_guarded_client_caches_without_recalling_provider(tmp_path) -> None:
+    class CountingClient(MockModelClient):
+        def __init__(self) -> None:
+            super().__init__(role="counting")
+            self.calls = 0
+
+        def generate(self, request):
+            self.calls += 1
+            return super().generate(request)
+
+    provider = CountingClient()
+    client = GuardedModelClient(
+        provider,
+        cache=ResponseCache(tmp_path / "cache"),
+        budget=BudgetManager(max_requests=2, max_tokens=1000, max_cost=1.0),
+        call_log=CallLogStore(tmp_path / "calls.jsonl"),
+        max_retries=1,
+    )
+    request = ModelRequest(
+        request_id="req-cache",
+        model="fixture-model",
+        system_prompt="Return JSON.",
+        user_prompt="caption",
+    )
+
+    first = client.generate(request)
+    second = client.generate(request)
+
+    assert first == second
+    assert provider.calls == 1
+    records = [json.loads(line) for line in (tmp_path / "calls.jsonl").read_text().splitlines()]
+    assert [record["cache_state"] for record in records] == ["miss", "hit"]
+
+
+def test_guarded_client_refuses_before_provider_when_budget_is_exhausted(tmp_path) -> None:
+    class CountingClient(MockModelClient):
+        def __init__(self) -> None:
+            super().__init__(role="counting")
+            self.calls = 0
+
+        def generate(self, request):
+            self.calls += 1
+            return super().generate(request)
+
+    provider = CountingClient()
+    client = GuardedModelClient(
+        provider,
+        cache=ResponseCache(tmp_path / "cache"),
+        budget=BudgetManager(max_requests=0, max_tokens=1000, max_cost=1.0),
+        call_log=CallLogStore(tmp_path / "calls.jsonl"),
+        max_retries=1,
+    )
+    request = ModelRequest(
+        request_id="req-budget",
+        model="fixture-model",
+        system_prompt="Return JSON.",
+        user_prompt="caption",
+    )
+
+    with pytest.raises(BudgetExceeded):
+        client.generate(request)
+
+    assert provider.calls == 0
+    record = json.loads((tmp_path / "calls.jsonl").read_text().strip())
+    assert record["error_type"] == "BudgetExceeded"
+    assert record["status"] == "BUDGET_EXCEEDED"

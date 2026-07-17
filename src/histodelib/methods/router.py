@@ -6,7 +6,7 @@ from dataclasses import dataclass
 from typing import Any, Protocol
 
 from histodelib.api.base import ModelClient
-from histodelib.schemas import ModelRequest
+from histodelib.schemas import ModelRequest, TokenUsage
 
 
 @dataclass(frozen=True)
@@ -33,6 +33,9 @@ class RuleRouter:
         "unreadable_glyph": "glyph",
         "modality_disagreement": "patch",
     }
+    api_calls = 0
+    last_api_calls = 0
+    last_usage = TokenUsage()
 
     def route(self, probe: dict[str, Any]) -> RouteDecision:
         flags = [str(flag) for flag in probe.get("risk_flags", [])]
@@ -52,6 +55,9 @@ class ApiRouter:
     def __init__(self, client: ModelClient) -> None:
         self.client = client
         self.rule_router = RuleRouter()
+        self.api_calls = 0
+        self.last_api_calls = 0
+        self.last_usage = TokenUsage()
 
     def route(self, probe: dict[str, Any]) -> RouteDecision:
         fallback = self.rule_router.route(probe)
@@ -63,6 +69,9 @@ class ApiRouter:
                 user_prompt=str(probe),
             )
         )
+        self.api_calls += 1
+        self.last_api_calls = 1
+        self.last_usage = response.usage
         return RouteDecision(
             reinspect=fallback.reinspect,
             reinspection_targets=fallback.reinspection_targets,
