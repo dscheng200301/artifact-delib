@@ -3,11 +3,18 @@ from __future__ import annotations
 import json
 
 import pytest
+import respx
+from httpx import Response
 
 from histodelib.api.budget import BudgetExceeded, BudgetManager
+from histodelib.api.call_log import CallLogStore, redact_secrets
 from histodelib.api.cache import ResponseCache
+from histodelib.api.cost import estimate_cost
 from histodelib.api.mock import MockModelClient
+from histodelib.api.openai_compatible import OpenAICompatibleClient
 from histodelib.api.response_parser import StructuredResponseError, parse_json_object
+from histodelib.api.retry import retry_call
+from histodelib.api.token_usage import TokenAccounting
 from histodelib.schemas import ModelRequest, TokenUsage
 
 
@@ -58,3 +65,67 @@ def test_response_parser_repairs_fenced_json_and_rejects_non_object() -> None:
 
     with pytest.raises(StructuredResponseError):
         parse_json_object("[1, 2]")
+
+
+def test_retry_call_retries_transient_failures_only() -> None:
+    attempts = 0
+
+    def operation() -> str:
+        nonlocal attempts
+        attempts += 1
+        if attempts < 3:
+            raise TimeoutError("temporary")
+        return "ok"
+
+    assert retry_call(operation, max_retries=3) == "ok"
+    assert attempts == 3
+
+
+def test_token_accounting_records_call_summary() -> None:
+    accounting = TokenAccounting()
+    record = accounting.record("req-1", input_tokens=4, output_tokens=6, latency_ms=12.5)
+
+    assert record.total_tokens == 10
+    assert accounting.total_tokens == 10
+    assert accounting.total_calls == 1
+
+
+@respx.mock
+def test_openai_compatible_client_normalizes_http_response() -> None:
+    route = respx.post("https://example.test/v1/chat/completions").mock(
+        return_value=Response(
+            200,
+            json={
+                "choices": [{"message": {"content": '{"label":"TRUE"}'}}],
+                "usage": {"prompt_tokens": 7, "completion_tokens": 3},
+            },
+        )
+    )
+    client = OpenAICompatibleClient(
+        base_url="https://example.test/v1",
+        api_key="secret",
+        timeout_seconds=5,
+        allow_paid_calls=True,
+    )
+    request = ModelRequest(
+        request_id="req-http",
+        model="remote-model",
+        system_prompt="system",
+        user_prompt="caption",
+    )
+
+    response = client.generate(request)
+
+    assert route.called
+    assert response.usage.total_tokens == 10
+    assert response.provider == "openai_compatible"
+
+
+def test_call_log_redacts_authorization_and_cost_is_optional(tmp_path) -> None:
+    assert "secret" not in redact_secrets("Authorization: Bearer secret")
+    store = CallLogStore(tmp_path / "calls.jsonl")
+    store.append({"error": "api_key=secret", "request_id": "req-1"})
+
+    assert "secret" not in (tmp_path / "calls.jsonl").read_text(encoding="utf-8")
+    assert estimate_cost(1000, 500, {"input_per_million": 1.0, "output_per_million": 2.0}) == 0.002
+    assert estimate_cost(1000, 500, None) is None

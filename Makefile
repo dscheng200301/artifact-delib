@@ -3,7 +3,8 @@ PYTHON ?= conda run -n histo-delib python
 .PHONY: env install doctor lint typecheck test fixture smoke-mock smoke-api verify clean-generated
 
 env:
-	conda env create -f environment.yml
+	conda run -n histo-delib python --version
+	conda run -n histo-delib python -m pip check
 
 install:
 	$(PYTHON) -m pip install -e .

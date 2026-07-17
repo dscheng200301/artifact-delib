@@ -1,4 +1,4 @@
-name: histodelib
+name: histo-delib
 channels:
   - conda-forge
 dependencies:
