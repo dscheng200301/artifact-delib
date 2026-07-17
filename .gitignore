@@ -12,6 +12,7 @@ dist/
 *.egg-info/
 .cache/
 outputs/
+tmp/
 reports/*.json
 reports/*.jsonl
 data/incoming/*

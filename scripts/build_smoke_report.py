@@ -1,5 +1,7 @@
 """Build a synthetic-only smoke report from structured prediction artifacts."""
 
+# ruff: noqa: E501
+
 from __future__ import annotations
 
 import argparse

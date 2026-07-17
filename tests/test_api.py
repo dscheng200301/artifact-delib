@@ -6,6 +6,7 @@ import pytest
 import respx
 from httpx import Response
 
+from histodelib.api.audited import AuditedModelClient
 from histodelib.api.budget import BudgetExceeded, BudgetManager
 from histodelib.api.cache import ResponseCache
 from histodelib.api.call_log import CallLogStore, redact_secrets
@@ -129,3 +130,26 @@ def test_call_log_redacts_authorization_and_cost_is_optional(tmp_path) -> None:
     assert "secret" not in (tmp_path / "calls.jsonl").read_text(encoding="utf-8")
     assert estimate_cost(1000, 500, {"input_per_million": 1.0, "output_per_million": 2.0}) == 0.002
     assert estimate_cost(1000, 500, None) is None
+
+
+def test_audited_client_records_usage_latency_and_cost(tmp_path) -> None:
+    client = AuditedModelClient(
+        MockModelClient(role="audited"),
+        CallLogStore(tmp_path / "calls.jsonl"),
+        pricing={"input_per_million": 1.0, "output_per_million": 2.0},
+    )
+    request = ModelRequest(
+        request_id="req-audit",
+        model="fixture-model",
+        system_prompt="Return JSON.",
+        user_prompt="caption",
+    )
+
+    response = client.generate(request)
+
+    assert client.accounting.total_calls == 1
+    record = json.loads((tmp_path / "calls.jsonl").read_text(encoding="utf-8"))
+    assert record["request_id"] == "req-audit"
+    assert record["cache_state"] == "disabled"
+    assert record["estimated_cost"] is not None
+    assert record["latency_ms"] == response.latency_ms

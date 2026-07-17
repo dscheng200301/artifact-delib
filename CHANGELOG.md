@@ -5,3 +5,5 @@
 - Added environment audit, approved engineering design, and implementation plan.
 - Added API-only project metadata, typed schemas/settings, synthetic data validation, safe mock API infrastructure, disagreement routing, deferred judging, metrics, and CLI fixture smoke path.
 - Added deferred paper-writing PDF prompt and research-boundary documentation; no formal datasets, experiments, or real API calls.
+- Added versioned prompt loading, audited token/latency/cost/error JSONL records, resumable baseline runs, and the four-page Chinese paper-writing specification PDF.
+- Verification evidence: 45 tests passed; Ruff, mypy, pip check, fixture validation, and mock smoke workflow passed. Formal data and experiments remain NOT_SELECTED/NOT_RUN.

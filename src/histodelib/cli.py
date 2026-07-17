@@ -7,6 +7,8 @@ from pathlib import Path
 
 import typer
 
+from histodelib.api.audited import AuditedModelClient
+from histodelib.api.call_log import CallLogStore
 from histodelib.api.mock import MockModelClient
 from histodelib.data.fixture_builder import build_fixture
 from histodelib.data.importer import import_manifest
@@ -100,8 +102,12 @@ def run(
     if method not in BASELINE_NAMES:
         raise typer.BadParameter(f"unsupported fixture method: {method}")
     samples = build_fixture(Path("data/fixtures"))
-    baseline = create_baseline(method, MockModelClient(role="vlm"))
     run_id = f"{method}-{config}-synthetic"
+    audited_client = AuditedModelClient(
+        MockModelClient(role="vlm"),
+        CallLogStore(output_root / run_id / "call_log.jsonl"),
+    )
+    baseline = create_baseline(method, audited_client)
     summary = RunManager(output_root).run(samples, baseline, run_id=run_id)
     run_dir = summary.run_dir
     (run_dir / "README.txt").write_text(

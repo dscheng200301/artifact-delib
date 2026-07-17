@@ -12,6 +12,7 @@ from histodelib.methods.judge import DeferredJudge
 from histodelib.methods.probe import LightRelationProbe
 from histodelib.methods.reinspection import TargetedReinspection
 from histodelib.methods.router import ApiRouter, RuleRouter
+from histodelib.prompts.loader import load_prompt
 from histodelib.schemas import Label
 
 
@@ -71,11 +72,16 @@ def test_text_and_image_agents_keep_inputs_isolated(tmp_path: Path) -> None:
 
     image_path = build_fixture(tmp_path)[0].image_path
     client = RecordingClient()
-    TextAgent(client).analyze("caption only")
-    ImageAgent(client).analyze(image_path)
+    prompt_root = Path(__file__).parents[1] / "prompts"
+    TextAgent(client, prompt=load_prompt(prompt_root / "text_agent" / "v1.yaml")).analyze(
+        "caption only"
+    )
+    ImageAgent(client, prompt=load_prompt(prompt_root / "image_agent" / "v1.yaml")).analyze(
+        image_path
+    )
 
     assert client.requests[0].image_base64 is None
-    assert client.requests[0].user_prompt == "caption only"
+    assert "caption only" in client.requests[0].user_prompt
     assert client.requests[1].image_base64 is not None
     assert "caption only" not in client.requests[1].user_prompt
 

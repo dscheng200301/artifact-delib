@@ -10,19 +10,20 @@
 
 ## Conda Environment
 
-Existing `histo-delib`; not created or changed by this repository.
+Existing `histo-delib`; no environment was created. The editable package install was verified in-place.
 
 ## Completed
 
 - Environment audit and engineering design/plan.
 - Existing `histo-delib` environment is now the only documented runtime; no environment creation commands remain.
-- API-only project metadata, typed schemas/settings, synthetic fixture builder and validation.
-- Mock API, OpenAI-compatible HTTP normalization, retry policy, cache, budget guard, response parsing, token/cost accounting, redacted call log, rule router, deferred judge, metrics, and CLI fixture workflow.
-- Mock smoke run generated only synthetic-labelled artifacts.
+- API-only project metadata, typed schemas/settings, synthetic fixture builder, manifest import, split and leakage checks.
+- Mock API, OpenAI-compatible HTTP normalization, retry policy, cache, budget guard, structured response parsing, token/cost accounting, audited redacted call logs, rule/API routers, deferred judge, bounded deliberation, metrics, resumable runner and CLI workflow.
+- Versioned YAML prompts are loaded and hashed by the modality-isolated agents.
+- Mock smoke run generated only synthetic-labelled artifacts; the paper-writing specification was rendered to a four-page PDF and visually inspected.
 
 ## In Progress
 
-- API-only project implementation and test fixture workflow.
+- Formal dataset selection, real API smoke tests and formal experiments remain intentionally deferred.
 
 ## Blocked
 
@@ -30,7 +31,7 @@ Existing `histo-delib`; not created or changed by this repository.
 
 ## Tests
 
-- 21 passed; Ruff and mypy checks passed.
+- 45 passed; Ruff, mypy and pip check passed in `histo-delib`.
 
 ## Mock Smoke Test
 
@@ -58,8 +59,8 @@ Existing `histo-delib`; not created or changed by this repository.
 
 ## Current Git Commit
 
-- `51c6430`
+- Updated after the implementation commit below.
 
 ## Next Executable Step
 
-- Split the remaining HistoDelib agents, probes, reinspection, and cross-examination modules.
+- Before any formal result claim: obtain data authorization, freeze prompts/models/API settings, run all baselines and ablations, and generate numbers only from structured artifacts.
