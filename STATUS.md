@@ -61,7 +61,7 @@ Existing `histo-delib`; no environment was created. The editable package install
 
 ## Current Git Commit
 
-- `5169e8d` (implementation and paper specification)
+- `cac6719` (guarded runtime and config-driven fixture implementation)
 
 ## Next Executable Step
 
