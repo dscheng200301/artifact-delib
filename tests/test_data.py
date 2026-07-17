@@ -1,0 +1,48 @@
+from __future__ import annotations
+
+from pathlib import Path
+
+from histodelib.data.fixture_builder import build_fixture
+from histodelib.data.leakage import find_group_leakage
+from histodelib.data.validator import validate_samples
+from histodelib.schemas import Label, Sample
+
+
+def test_fixture_builder_creates_labelled_synthetic_images(tmp_path: Path) -> None:
+    samples = build_fixture(tmp_path)
+
+    assert {sample.label for sample in samples} == set(Label)
+    assert all(sample.image_path.exists() for sample in samples)
+    assert all(sample.is_synthetic_fixture for sample in samples)
+    assert validate_samples(samples).is_valid is True
+
+
+def test_validator_rejects_duplicate_ids_and_missing_images(tmp_path: Path) -> None:
+    missing = Sample(
+        sample_id="duplicate",
+        image_path=tmp_path / "missing.png",
+        caption="caption",
+        label=Label.TRUE,
+        fixture_markers={"SYNTHETIC_FIXTURE", "NOT_FOR_RESEARCH_RESULTS"},
+    )
+    duplicate = missing.model_copy(update={"image_path": tmp_path / "also-missing.png"})
+
+    report = validate_samples([missing, duplicate])
+
+    assert report.is_valid is False
+    assert "duplicate sample_id: duplicate" in report.errors
+    assert any("image does not exist" in error for error in report.errors)
+
+
+def test_group_leakage_flags_group_in_multiple_splits(tmp_path: Path) -> None:
+    first = Sample(
+        sample_id="one",
+        image_path=tmp_path / "one.png",
+        caption="one",
+        label=Label.TRUE,
+        original_group_id="same-original",
+        split="train",
+    )
+    second = first.model_copy(update={"sample_id": "two", "split": "test"})
+
+    assert find_group_leakage([first, second]) == {"same-original": {"train", "test"}}

@@ -46,7 +46,7 @@ class Settings(BaseSettings):
     log_level: str = "INFO"
     store_raw_api_responses: bool = False
 
-    def redacted(self) -> "Settings":
+    def redacted(self) -> Settings:
         """Return a copy that is safe to serialize or write into artifacts."""
 
         replacements = {

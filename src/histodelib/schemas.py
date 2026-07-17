@@ -25,7 +25,7 @@ class TokenUsage(BaseModel):
     input_tokens: int = Field(default=0, ge=0)
     output_tokens: int = Field(default=0, ge=0)
 
-    @computed_field(return_type=int)
+    @computed_field(return_type=int)  # type: ignore[prop-decorator]
     @property
     def total_tokens(self) -> int:
         return self.input_tokens + self.output_tokens
@@ -55,12 +55,10 @@ class Sample(BaseModel):
             raise ValueError("caption must not be blank")
         return value
 
-    @computed_field(return_type=bool)
+    @computed_field(return_type=bool)  # type: ignore[prop-decorator]
     @property
     def is_synthetic_fixture(self) -> bool:
-        return {"SYNTHETIC_FIXTURE", "NOT_FOR_RESEARCH_RESULTS"}.issubset(
-            self.fixture_markers
-        )
+        return {"SYNTHETIC_FIXTURE", "NOT_FOR_RESEARCH_RESULTS"}.issubset(self.fixture_markers)
 
 
 class ModelRequest(BaseModel):

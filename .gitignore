@@ -16,6 +16,6 @@ reports/*.json
 reports/*.jsonl
 data/incoming/*
 data/processed/*
+data/fixtures/
 !data/incoming/.gitkeep
 !data/processed/.gitkeep
-!data/fixtures/

@@ -29,6 +29,7 @@ line-length = 100
 
 [tool.ruff.lint]
 select = ["E", "F", "I", "UP", "B"]
+ignore = ["B008"] # Typer declares CLI options in function defaults.
 
 [tool.mypy]
 python_version = "3.12"

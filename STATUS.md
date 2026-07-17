@@ -15,6 +15,9 @@ Existing `histo-delib`; not created or changed by this repository.
 ## Completed
 
 - Environment audit and engineering design/plan.
+- API-only project metadata, typed schemas/settings, synthetic fixture builder and validation.
+- Mock API, cache, budget guard, response parsing, rule router, deferred judge, metrics, and CLI fixture workflow.
+- Mock smoke run generated only synthetic-labelled artifacts.
 
 ## In Progress
 
@@ -26,11 +29,11 @@ Existing `histo-delib`; not created or changed by this repository.
 
 ## Tests
 
-- NOT_RUN for the full suite.
+- 21 passed; Ruff and mypy checks passed.
 
 ## Mock Smoke Test
 
-- NOT_RUN.
+- PASSED with `histodelib_rule` on synthetic fixtures only.
 
 ## Real API Smoke Test
 
@@ -46,7 +49,7 @@ Existing `histo-delib`; not created or changed by this repository.
 
 ## Last Successful Command
 
-- `conda run -n histo-delib python --version`
+- `PYTHONPATH=src conda run -n histo-delib python -m histodelib.cli run --method histodelib_rule --config fixture` (mock only)
 
 ## Last Failed Command
 
@@ -54,8 +57,8 @@ Existing `histo-delib`; not created or changed by this repository.
 
 ## Current Git Commit
 
-- `0202fd5`
+- Pending current implementation commit.
 
 ## Next Executable Step
 
-- Install declared dependencies and implement typed schemas using TDD.
+- Run final regression checks and extend remaining baseline variants before any authorized real API work.
