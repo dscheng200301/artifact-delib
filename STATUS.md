@@ -15,8 +15,9 @@ Existing `histo-delib`; not created or changed by this repository.
 ## Completed
 
 - Environment audit and engineering design/plan.
+- Existing `histo-delib` environment is now the only documented runtime; no environment creation commands remain.
 - API-only project metadata, typed schemas/settings, synthetic fixture builder and validation.
-- Mock API, cache, budget guard, response parsing, rule router, deferred judge, metrics, and CLI fixture workflow.
+- Mock API, OpenAI-compatible HTTP normalization, retry policy, cache, budget guard, response parsing, token/cost accounting, redacted call log, rule router, deferred judge, metrics, and CLI fixture workflow.
 - Mock smoke run generated only synthetic-labelled artifacts.
 
 ## In Progress
@@ -57,8 +58,8 @@ Existing `histo-delib`; not created or changed by this repository.
 
 ## Current Git Commit
 
-- `8e404e4`
+- `51c6430`
 
 ## Next Executable Step
 
-- Run final regression checks and extend remaining baseline variants before any authorized real API work.
+- Split the remaining HistoDelib agents, probes, reinspection, and cross-examination modules.
