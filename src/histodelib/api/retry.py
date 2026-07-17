@@ -10,7 +10,7 @@ import httpx
 T = TypeVar("T")
 
 
-def retry_call(operation: Callable[[], T], max_retries: int) -> T:
+def retry_call(operation: Callable[[], T], max_retries: int) -> T:  # noqa: UP047
     """Retry timeouts and 429/5xx responses up to ``max_retries`` attempts."""
 
     attempts = max(1, max_retries)

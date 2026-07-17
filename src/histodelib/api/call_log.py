@@ -7,7 +7,6 @@ import re
 from pathlib import Path
 from typing import Any
 
-
 _SECRET = re.compile(r"(?i)(authorization\s*:\s*bearer\s+|api[_-]?key\s*[=:]\s*)([^\s,;]+)")
 
 
@@ -25,6 +24,9 @@ class CallLogStore:
         self.path.parent.mkdir(parents=True, exist_ok=True)
 
     def append(self, record: dict[str, Any]) -> None:
-        clean = {key: redact_secrets(str(value)) if isinstance(value, str) else value for key, value in record.items()}
+        clean = {
+            key: redact_secrets(str(value)) if isinstance(value, str) else value
+            for key, value in record.items()
+        }
         with self.path.open("a", encoding="utf-8") as handle:
             handle.write(json.dumps(clean, ensure_ascii=False, sort_keys=True) + "\n")

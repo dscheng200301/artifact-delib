@@ -19,9 +19,7 @@ def test_project_declares_api_only_python_312_runtime() -> None:
 
 def test_runtime_scripts_use_existing_histo_delib_environment() -> None:
     scripts = "\n".join(
-        path.read_text(encoding="utf-8")
-        for path in (ROOT / "scripts").glob("*")
-        if path.is_file()
+        path.read_text(encoding="utf-8") for path in (ROOT / "scripts").glob("*") if path.is_file()
     )
     makefile = (ROOT / "Makefile").read_text(encoding="utf-8")
 

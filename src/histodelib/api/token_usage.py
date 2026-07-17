@@ -23,7 +23,9 @@ class TokenAccounting:
     def __init__(self) -> None:
         self.records: list[TokenRecord] = []
 
-    def record(self, request_id: str, input_tokens: int, output_tokens: int, latency_ms: float) -> TokenRecord:
+    def record(
+        self, request_id: str, input_tokens: int, output_tokens: int, latency_ms: float
+    ) -> TokenRecord:
         record = TokenRecord(request_id, input_tokens, output_tokens, latency_ms)
         self.records.append(record)
         return record
@@ -38,4 +40,8 @@ class TokenAccounting:
 
     @property
     def average_latency_ms(self) -> float:
-        return sum(record.latency_ms for record in self.records) / len(self.records) if self.records else 0.0
+        return (
+            sum(record.latency_ms for record in self.records) / len(self.records)
+            if self.records
+            else 0.0
+        )
