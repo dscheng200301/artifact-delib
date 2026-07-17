@@ -3,7 +3,9 @@ from __future__ import annotations
 from pathlib import Path
 
 from histodelib.data.fixture_builder import build_fixture
+from histodelib.data.importer import import_manifest
 from histodelib.data.leakage import find_group_leakage
+from histodelib.data.splitter import split_samples
 from histodelib.data.validator import validate_samples
 from histodelib.schemas import Label, Sample
 
@@ -46,3 +48,35 @@ def test_group_leakage_flags_group_in_multiple_splits(tmp_path: Path) -> None:
     second = first.model_copy(update={"sample_id": "two", "split": "test"})
 
     assert find_group_leakage([first, second]) == {"same-original": {"train", "test"}}
+
+
+def test_manifest_import_and_group_aware_split(tmp_path: Path) -> None:
+    sample = build_fixture(tmp_path)[0]
+    manifest = tmp_path / "manifest.csv"
+    manifest.write_text(
+        "sample_id,image_path,caption,label,original_group_id\n"
+        f"{sample.sample_id},{sample.image_path.name},caption,TRUE,group-a\n",
+        encoding="utf-8",
+    )
+
+    imported = import_manifest(manifest, tmp_path / "images")
+    split = split_samples(imported, seed=7)
+
+    assert imported[0].image_path == sample.image_path
+    assert set(split) == {"train", "validation", "test"}
+    assert sum(len(items) for items in split.values()) == 1
+
+
+def test_manifest_import_rejects_path_escape(tmp_path: Path) -> None:
+    manifest = tmp_path / "manifest.csv"
+    manifest.write_text(
+        "sample_id,image_path,caption,label\nunsafe,../secret.png,caption,TRUE\n",
+        encoding="utf-8",
+    )
+
+    try:
+        import_manifest(manifest, tmp_path / "images")
+    except ValueError as exc:
+        assert "outside image root" in str(exc)
+    else:
+        raise AssertionError("path traversal should be rejected")

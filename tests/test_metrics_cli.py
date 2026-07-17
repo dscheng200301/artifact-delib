@@ -5,6 +5,7 @@ from pathlib import Path
 from typer.testing import CliRunner
 
 from histodelib.cli import app
+from histodelib.data.fixture_builder import build_fixture
 from histodelib.metrics import compute_metrics
 from histodelib.schemas import Label, Prediction
 
@@ -34,3 +35,27 @@ def test_fixture_cli_builds_and_validates_synthetic_data(tmp_path: Path) -> None
     assert "SYNTHETIC_FIXTURE" in result.output
     assert validation.exit_code == 0, validation.output
     assert "valid" in validation.output.lower()
+
+
+def test_data_import_cli_validates_local_manifest(tmp_path: Path) -> None:
+    sample = build_fixture(tmp_path)[0]
+    manifest = tmp_path / "manifest.csv"
+    manifest.write_text(
+        "sample_id,image_path,caption,label\n"
+        f"{sample.sample_id},{sample.image_path.name},caption,TRUE\n",
+        encoding="utf-8",
+    )
+    result = CliRunner().invoke(
+        app,
+        [
+            "data",
+            "import",
+            "--manifest",
+            str(manifest),
+            "--image-root",
+            str(tmp_path / "images"),
+        ],
+    )
+
+    assert result.exit_code == 0, result.output
+    assert "imported 1 samples" in result.output

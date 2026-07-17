@@ -10,6 +10,7 @@ import typer
 
 from histodelib.api.mock import MockModelClient
 from histodelib.data.fixture_builder import build_fixture
+from histodelib.data.importer import import_manifest
 from histodelib.data.validator import validate_samples
 from histodelib.methods.histodelib import HistoDelibMethod
 from histodelib.methods.router import RuleRouter
@@ -17,7 +18,9 @@ from histodelib.settings import Settings
 
 app = typer.Typer(help="HistoDelib API-only engineering commands.", no_args_is_help=True)
 fixture_app = typer.Typer(help="Build and validate synthetic test fixtures.")
+data_app = typer.Typer(help="Validate local dataset manifests without downloading data.")
 app.add_typer(fixture_app, name="fixture")
+app.add_typer(data_app, name="data")
 
 
 @app.command()
@@ -52,6 +55,22 @@ def fixture_validate(root: Path = typer.Option(Path("data/fixtures"))) -> None:
             typer.echo(error, err=True)
         raise typer.Exit(code=1)
     typer.echo("fixture valid: SYNTHETIC_FIXTURE; NOT_FOR_RESEARCH_RESULTS")
+
+
+@data_app.command("import")
+def data_import(
+    manifest: Path = typer.Option(...), image_root: Path = typer.Option(...)
+) -> None:
+    """Import and validate a user-provided local manifest."""
+
+    samples = import_manifest(manifest, image_root)
+    report = validate_samples(samples)
+    if not report.is_valid:
+        for error in report.errors:
+            typer.echo(error, err=True)
+        raise typer.Exit(code=1)
+    typer.echo(f"imported {len(samples)} samples")
+    typer.echo("formal dataset remains NOT_SELECTED until explicitly authorized")
 
 
 @app.command()
