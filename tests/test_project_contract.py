@@ -32,3 +32,14 @@ def test_runtime_scripts_use_existing_histo_delib_environment() -> None:
 def test_gitignore_protects_env_credentials() -> None:
     ignored = (ROOT / ".gitignore").read_text(encoding="utf-8")
     assert ".env" in ignored.splitlines()
+
+
+def test_reproducible_verification_scripts_exist() -> None:
+    for name in ("verify.ps1", "verify.sh", "build_smoke_report.py"):
+        assert (ROOT / "scripts" / name).exists()
+
+
+def test_editable_build_uses_available_setuptools_backend() -> None:
+    pyproject = (ROOT / "pyproject.toml").read_text(encoding="utf-8")
+
+    assert "setuptools.build_meta" in pyproject

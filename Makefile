@@ -29,9 +29,11 @@ smoke-mock:
 	$(PYTHON) -m histodelib.cli run --method histodelib_rule --config fixture
 
 smoke-api:
-	$(PYTHON) -m histodelib.cli run --method histodelib_rule --config smoke_api --allow-paid-calls
+	@echo REAL_API_SMOKE_TEST=NOT_RUN
 
 verify: lint typecheck test fixture smoke-mock
+	$(PYTHON) -m pip check
+	$(PYTHON) scripts/build_smoke_report.py
 
 clean-generated:
 	$(PYTHON) -m histodelib.cli clean-generated

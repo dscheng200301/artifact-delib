@@ -1,6 +1,6 @@
 [build-system]
-requires = ["hatchling>=1.27"]
-build-backend = "hatchling.build"
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
 
 [project]
 name = "histodelib"
@@ -15,8 +15,8 @@ dependencies = []
 [project.scripts]
 histodelib = "histodelib.cli:app"
 
-[tool.hatch.build.targets.wheel]
-packages = ["src/histodelib"]
+[tool.setuptools.packages.find]
+where = ["src"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
