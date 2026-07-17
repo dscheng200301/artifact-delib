@@ -62,7 +62,7 @@ Existing `histo-delib`; no environment was created. The editable package install
 
 ## Current Git Commit
 
-- `cac6719` (guarded runtime and config-driven fixture implementation)
+- `40c600c` (qwen3.5-flash model default integration)
 
 ## Next Executable Step
 
