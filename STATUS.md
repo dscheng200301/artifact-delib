@@ -59,7 +59,7 @@ Existing `histo-delib`; no environment was created. The editable package install
 
 ## Current Git Commit
 
-- Updated after the implementation commit below.
+- `5169e8d` (implementation and paper specification)
 
 ## Next Executable Step
 
