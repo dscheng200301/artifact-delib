@@ -8,6 +8,7 @@ from typing import Protocol
 
 from histodelib.api.base import ModelClient
 from histodelib.api.response_parser import parse_json_object
+from histodelib.constants import DEFAULT_MODEL
 from histodelib.methods.histodelib import HistoDelibMethod
 from histodelib.methods.router import ApiRouter, RuleRouter
 from histodelib.schemas import Label, ModelRequest, Prediction, Sample, TokenUsage
@@ -42,7 +43,7 @@ class SingleCallBaseline:
         response = self.client.generate(
             ModelRequest(
                 request_id=str(uuid.uuid4()),
-                model="fixture-model",
+                model=DEFAULT_MODEL,
                 system_prompt=f"Baseline {self.name}. Return a JSON label.",
                 user_prompt=sample.caption,
             )
@@ -72,7 +73,7 @@ class RepeatedBaseline:
             response = self.client.generate(
                 ModelRequest(
                     request_id=str(uuid.uuid4()),
-                    model="fixture-model",
+                    model=DEFAULT_MODEL,
                     system_prompt=f"Baseline {self.name}. Return a JSON label.",
                     user_prompt=sample.caption,
                 )

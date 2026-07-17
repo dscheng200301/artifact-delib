@@ -21,6 +21,7 @@ Existing `histo-delib`; no environment was created. The editable package install
 - Versioned YAML prompts are loaded and hashed by the modality-isolated agents.
 - Guarded client is now wired into fixture runs for cache hits/misses, conservative pre-call budgets, retries, and redacted call logs; YAML run configs are persisted as resolved artifacts.
 - Fixture builder creates 12 synthetic samples (four per class); API-router call counts include the router request per sample.
+- The default model configuration is now `qwen3.5-flash` across text, image, router, judge, and baseline requests.
 - Mock smoke run generated only synthetic-labelled artifacts; the paper-writing specification was rendered to a four-page PDF and visually inspected.
 
 ## In Progress
@@ -33,7 +34,7 @@ Existing `histo-delib`; no environment was created. The editable package install
 
 ## Tests
 
-- 53 passed; Ruff, mypy and pip check passed in `histo-delib`.
+- 54 passed; Ruff, mypy and pip check passed in `histo-delib`.
 
 ## Mock Smoke Test
 

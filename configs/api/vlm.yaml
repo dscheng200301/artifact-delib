@@ -1,4 +1,4 @@
 role: vlm
 provider: openai_compatible
-model: null
+model: qwen3.5-flash
 base_url: null

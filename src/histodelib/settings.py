@@ -26,11 +26,11 @@ class Settings(BaseSettings):
 
     llm_api_key: str | None = None
     llm_base_url: str | None = None
-    llm_model: str | None = None
+    llm_model: str | None = "qwen3.5-flash"
     llm_provider: str = "openai_compatible"
     vlm_api_key: str | None = None
     vlm_base_url: str | None = None
-    vlm_model: str | None = None
+    vlm_model: str | None = "qwen3.5-flash"
     vlm_provider: str = "openai_compatible"
     judge_api_key: str | None = None
     judge_base_url: str | None = None

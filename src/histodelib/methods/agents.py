@@ -10,6 +10,7 @@ from typing import Any
 
 from histodelib.api.base import ModelClient
 from histodelib.api.response_parser import parse_json_object
+from histodelib.constants import DEFAULT_MODEL
 from histodelib.prompts.loader import PromptSpec, load_prompt
 from histodelib.schemas import Label, ModelRequest, TokenUsage
 
@@ -34,7 +35,7 @@ class TextAgent:
         response = self.client.generate(
             ModelRequest(
                 request_id=str(uuid.uuid4()),
-                model="fixture-model",
+                model=DEFAULT_MODEL,
                 system_prompt=(
                     rendered.system_prompt
                     if rendered
@@ -63,7 +64,7 @@ class ImageAgent:
         response = self.client.generate(
             ModelRequest(
                 request_id=str(uuid.uuid4()),
-                model="fixture-model",
+                model=DEFAULT_MODEL,
                 system_prompt=(
                     rendered.system_prompt
                     if rendered

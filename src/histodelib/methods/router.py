@@ -6,6 +6,7 @@ from dataclasses import dataclass
 from typing import Any, Protocol
 
 from histodelib.api.base import ModelClient
+from histodelib.constants import DEFAULT_MODEL
 from histodelib.schemas import ModelRequest, TokenUsage
 
 
@@ -64,7 +65,7 @@ class ApiRouter:
         response = self.client.generate(
             ModelRequest(
                 request_id="router-probe",
-                model="fixture-model",
+                model=DEFAULT_MODEL,
                 system_prompt="Return only a concise routing JSON object.",
                 user_prompt=str(probe),
             )

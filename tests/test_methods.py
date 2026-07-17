@@ -108,8 +108,10 @@ def test_text_and_image_agents_keep_inputs_isolated(tmp_path: Path) -> None:
     )
 
     assert client.requests[0].image_base64 is None
+    assert client.requests[0].model == "qwen3.5-flash"
     assert "caption only" in client.requests[0].user_prompt
     assert client.requests[1].image_base64 is not None
+    assert client.requests[1].model == "qwen3.5-flash"
     assert "caption only" not in client.requests[1].user_prompt
 
 

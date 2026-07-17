@@ -38,3 +38,9 @@ def test_repository_has_required_prompt_versions() -> None:
     root = Path(__file__).resolve().parents[1]
     for name in ("text_agent", "image_agent", "relation_probe", "cross_exam", "judge"):
         assert (root / "prompts" / name / "v1.yaml").exists()
+
+
+def test_repository_defaults_to_qwen35_flash_for_all_modalities() -> None:
+    root = Path(__file__).resolve().parents[1]
+    assert "qwen3.5-flash" in (root / "configs" / "api" / "llm.yaml").read_text()
+    assert "qwen3.5-flash" in (root / "configs" / "api" / "vlm.yaml").read_text()

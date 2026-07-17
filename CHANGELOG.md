@@ -8,3 +8,4 @@
 - Added versioned prompt loading, audited token/latency/cost/error JSONL records, resumable baseline runs, and the four-page Chinese paper-writing specification PDF.
 - Verification evidence: 53 tests passed; Ruff, mypy, pip check, fixture validation, and mock smoke workflow passed. Formal data and experiments remain NOT_SELECTED/NOT_RUN.
 - Added guarded client integration for pre-call budget reservation, deterministic response caching, retry handling, resolved YAML run configs, twelve-sample synthetic fixtures, and per-sample API-router call accounting.
+- Set the default API-only model to `qwen3.5-flash` across all modalities and baseline request paths.
