@@ -1,6 +1,9 @@
 from __future__ import annotations
 
 import json
+import threading
+import time
+from concurrent.futures import ThreadPoolExecutor
 
 import pytest
 import respx
@@ -263,3 +266,45 @@ def test_guarded_client_refuses_before_provider_when_budget_is_exhausted(tmp_pat
     record = json.loads((tmp_path / "calls.jsonl").read_text().strip())
     assert record["error_type"] == "BudgetExceeded"
     assert record["status"] == "BUDGET_EXCEEDED"
+
+
+def test_guarded_client_enforces_max_concurrency(tmp_path) -> None:
+    class SlowClient(MockModelClient):
+        def __init__(self) -> None:
+            super().__init__(role="slow")
+            self.active = 0
+            self.max_active = 0
+            self.lock = threading.Lock()
+
+        def generate(self, request):
+            with self.lock:
+                self.active += 1
+                self.max_active = max(self.max_active, self.active)
+            time.sleep(0.02)
+            with self.lock:
+                self.active -= 1
+            return super().generate(request)
+
+    provider = SlowClient()
+    client = GuardedModelClient(
+        provider,
+        cache=ResponseCache(tmp_path / "cache"),
+        budget=BudgetManager(max_requests=4, max_tokens=5000, max_cost=1.0),
+        call_log=CallLogStore(tmp_path / "calls.jsonl"),
+        max_retries=1,
+        max_concurrency=1,
+    )
+    requests = [
+        ModelRequest(
+            request_id=f"req-{index}",
+            model="fixture-model",
+            system_prompt="Return JSON.",
+            user_prompt=f"caption-{index}",
+        )
+        for index in range(4)
+    ]
+
+    with ThreadPoolExecutor(max_workers=4) as pool:
+        list(pool.map(client.generate, requests))
+
+    assert provider.max_active == 1

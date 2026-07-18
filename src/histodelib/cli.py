@@ -15,13 +15,16 @@ from histodelib.api.factory import build_remote_client, selected_model
 from histodelib.api.guarded import GuardedModelClient
 from histodelib.api.mock import MockModelClient
 from histodelib.config import load_config
+from histodelib.config_schema import validate_runtime_config
 from histodelib.data.fixture_builder import build_fixture
 from histodelib.data.importer import import_manifest
 from histodelib.data.validator import validate_samples
+from histodelib.experiments.matrix import plan_experiments
 from histodelib.methods.baselines import BASELINE_NAMES, create_baseline
 from histodelib.reporting import write_run_report
 from histodelib.runner.run_manager import RunManager
 from histodelib.settings import Settings
+from histodelib.validation.smoke import validate_smoke_artifacts
 
 app = typer.Typer(help="HistoDelib API-only engineering commands.", no_args_is_help=True)
 fixture_app = typer.Typer(help="Build and validate synthetic test fixtures.")
@@ -114,7 +117,7 @@ def run(
     )
     method_config_path = Path("configs/method") / f"{method}.yaml"
     method_config = load_config(method_config_path) if method_config_path.exists() else {}
-    resolved_config = {**method_config, **run_config}
+    resolved_config = validate_runtime_config({**method_config, **run_config})
     config_name = str(resolved_config.get("name", config_path.stem or config))
     safe_config_name = re.sub(r"[^A-Za-z0-9_.-]+", "-", config_name).strip("-") or "fixture"
     settings = Settings()
@@ -142,7 +145,7 @@ def run(
         run_id = f"{method}-{safe_config_name}-api-synthetic"
         guarded_client = build_remote_client(settings, output_root / run_id)
         resolved_config = {
-            **resolved_config,
+            **validate_runtime_config(resolved_config),
             "mode": "api",
             "synthetic_only": True,
             "enable_api_deliberation": True,
@@ -156,14 +159,19 @@ def run(
         max_cross_exam_rounds=int(resolved_config.get("max_cross_exam_rounds", 2)),
     )
     summary = RunManager(output_root).run(
-        samples, baseline, run_id=run_id, resolved_config=resolved_config
+        samples,
+        baseline,
+        run_id=run_id,
+        resolved_config=resolved_config,
+        mode=mode,
     )
     run_dir = summary.run_dir
     (run_dir / "README.txt").write_text(
         "SYNTHETIC_FIXTURE\nNOT_FOR_RESEARCH_RESULTS\n",
         encoding="utf-8",
     )
-    typer.echo(f"mock fixture run complete: {run_dir}")
+    run_kind = "remote API synthetic smoke" if mode == "api" else "mock fixture"
+    typer.echo(f"{run_kind} run complete: {run_dir}")
     typer.echo("SYNTHETIC_FIXTURE; NOT_FOR_RESEARCH_RESULTS")
 
 
@@ -175,6 +183,33 @@ def clean_generated() -> None:
     if output_root.exists():
         shutil.rmtree(output_root)
     typer.echo("generated outputs removed")
+
+
+@app.command("validate-smoke")
+def validate_smoke(
+    run_dir: Path = typer.Argument(...),
+    expected_predictions: int = typer.Option(12, min=1),
+) -> None:
+    """Fail closed when a synthetic API smoke artifact is incomplete."""
+
+    result = validate_smoke_artifacts(run_dir, expected_predictions=expected_predictions)
+    if not result.ok:
+        for error in result.errors:
+            typer.echo(error, err=True)
+        raise typer.Exit(code=1)
+    typer.echo(
+        f"smoke valid: predictions={result.prediction_count}; "
+        f"api_calls={result.api_calls}; providers={','.join(result.providers)}"
+    )
+
+
+@app.command("experiment-plan")
+def experiment_plan(matrix: Path = typer.Argument(...)) -> None:
+    """Print a dry-run experiment matrix; this command never calls an API."""
+
+    plans = plan_experiments(matrix)
+    for plan in plans:
+        typer.echo(f"{plan.matrix_name}\t{plan.method}\t{plan.config}\t{plan.formal_dataset}")
 
 
 if __name__ == "__main__":

@@ -108,6 +108,26 @@ def test_histodelib_api_deliberation_adds_bounded_followup_calls(tmp_path: Path)
     assert prediction.evidence["judge_api_calls"] == 1
 
 
+def test_histodelib_api_router_full_protocol_is_bounded(tmp_path: Path) -> None:
+    sample = next(
+        sample for sample in build_fixture(tmp_path) if sample.label is Label.MISCAPTIONED
+    )
+
+    prediction = create_baseline(
+        "histodelib_api_router",
+        MockModelClient(role="full-protocol"),
+        enable_api_deliberation=True,
+        max_reinspection_targets=1,
+        max_cross_exam_rounds=1,
+    ).run(sample)
+
+    assert prediction.status == "COMPLETED"
+    assert prediction.api_calls >= 5
+    assert prediction.evidence["reinspection_api_calls"] <= 1
+    assert prediction.evidence["cross_exam_api_calls"] <= 1
+    assert prediction.evidence["judge_api_calls"] == 1
+
+
 def test_text_and_image_agents_keep_inputs_isolated(tmp_path: Path) -> None:
     class RecordingClient(MockModelClient):
         def __init__(self) -> None:

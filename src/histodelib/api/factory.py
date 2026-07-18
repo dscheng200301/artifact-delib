@@ -52,6 +52,7 @@ def build_remote_client(settings: Settings, run_dir: Path) -> GuardedModelClient
         call_log=CallLogStore(run_dir / "call_log.jsonl"),
         max_retries=settings.api_max_retries,
         pricing=pricing,
+        max_concurrency=settings.api_max_concurrency,
     )
 
 

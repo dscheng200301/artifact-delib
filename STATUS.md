@@ -24,6 +24,8 @@ Existing `histo-delib`; no environment was created. The editable package install
 - The default model configuration is now the fixed `qwen3.5-flash-2026-02-23` snapshot across text, image, router, judge, and baseline requests; DashScope OpenAI-compatible endpoints and a CNY pricing example are recorded.
 - Remote-client construction is fail-closed and guarded by cache, retries, budgets, redacted call logs, and an explicit paid-call gate; API reinspection, cross-examination, and deferred-judge paths are bounded and tested.
 - Named baselines now declare modality payloads and call schedules; method/run YAML values drive model and deliberation limits into execution.
+- API run metadata now records `mode=api`; smoke artifacts have fail-closed validation; runtime YAML controls are validated while provenance fields are preserved.
+- A bounded provider semaphore honors `API_MAX_CONCURRENCY`, and an experiment-matrix dry-run expands methods/configs without API calls or formal data access.
 - Mock smoke run generated only synthetic-labelled artifacts; the paper-writing specification was rendered to a four-page PDF and visually inspected.
 
 ## In Progress
@@ -36,7 +38,7 @@ Existing `histo-delib`; no environment was created. The editable package install
 
 ## Tests
 
-- 67 passed; Ruff, mypy and pip check passed in `histo-delib`.
+- 79 passed; Ruff, mypy and pip check passed in `histo-delib`.
 
 ## Mock Smoke Test
 
@@ -68,4 +70,4 @@ Existing `histo-delib`; no environment was created. The editable package install
 
 ## Next Executable Step
 
-- Obtain data authorization, freeze prompts/models/API settings, run all baselines and ablations, and generate numbers only from structured artifacts.
+- Add statistical aggregation and formal dataset provenance only after data authorization; then freeze prompts/models/API settings, run all baselines and ablations, and generate numbers only from structured artifacts.

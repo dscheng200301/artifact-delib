@@ -31,10 +31,16 @@ fi
 
 cd "${ROOT_DIR}"
 export PYTHONPATH="${ROOT_DIR}/src${PYTHONPATH:+:${PYTHONPATH}}"
+SMOKE_ROOT="outputs/qwen-smoke-$(date -u +%Y%m%d-%H%M%S)"
 
 conda run --no-capture-output -n histo-delib \
   python -m histodelib.cli run \
   --mode api \
   --method direct_vlm \
   --config configs/api/default.yaml \
-  --output-root outputs
+  --output-root "${SMOKE_ROOT}"
+
+conda run --no-capture-output -n histo-delib \
+  python -m histodelib.cli validate-smoke \
+  "${SMOKE_ROOT}/direct_vlm-default-api-synthetic" \
+  --expected-predictions 12

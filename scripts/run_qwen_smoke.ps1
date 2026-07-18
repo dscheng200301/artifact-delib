@@ -28,11 +28,19 @@ if ($PaidCalls -ne "true") {
 
 Set-Location -LiteralPath $RootDir
 $env:PYTHONPATH = "$RootDir\src" + $(if ($env:PYTHONPATH) { ";$env:PYTHONPATH" } else { "" })
+$SmokeRoot = Join-Path $RootDir ("outputs/qwen-smoke-" + (Get-Date).ToUniversalTime().ToString("yyyyMMdd-HHmmss"))
+$SmokeRunDir = Join-Path $SmokeRoot "direct_vlm-default-api-synthetic"
 
 conda run --no-capture-output -n histo-delib `
     python -m histodelib.cli run `
     --mode api `
     --method direct_vlm `
     --config configs/api/default.yaml `
-    --output-root outputs
+    --output-root $SmokeRoot
+if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
+conda run --no-capture-output -n histo-delib `
+    python -m histodelib.cli validate-smoke `
+    $SmokeRunDir `
+    --expected-predictions 12
 if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }

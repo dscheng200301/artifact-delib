@@ -37,7 +37,10 @@ class RunManager:
         method: Runnable,
         run_id: str,
         resolved_config: dict[str, object] | None = None,
+        mode: str = "fixture",
     ) -> RunSummary:
+        if mode not in {"fixture", "api"}:
+            raise ValueError("mode must be fixture or api")
         run_dir = self.output_root / run_id
         run_dir.mkdir(parents=True, exist_ok=True)
         prediction_path = run_dir / "predictions.jsonl"
@@ -55,7 +58,7 @@ class RunManager:
                 handle.write(prediction.model_dump_json() + "\n")
                 existing[sample.sample_id] = prediction
         config = {
-            "mode": "fixture",
+            "mode": mode,
             "synthetic_only": True,
             "formal_experiment": "NOT_RUN",
             **(resolved_config or {}),
@@ -68,7 +71,7 @@ class RunManager:
             json.dumps(
                 {
                     "run_id": run_id,
-                    "mode": "fixture",
+                    "mode": mode,
                     "formal_dataset": "NOT_SELECTED",
                     "formal_experiment": "NOT_RUN",
                     "prediction_count": len(existing),

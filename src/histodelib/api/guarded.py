@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import threading
 
 from histodelib.api.base import ModelClient
 from histodelib.api.budget import BudgetManager
@@ -26,6 +27,7 @@ class GuardedModelClient:
         call_log: CallLogStore,
         max_retries: int = 0,
         pricing: dict[str, object] | None = None,
+        max_concurrency: int = 1,
     ) -> None:
         self.client = client
         self.cache = cache
@@ -34,6 +36,9 @@ class GuardedModelClient:
         self.max_retries = max(1, max_retries)
         self.pricing = pricing
         self.accounting = TokenAccounting()
+        if max_concurrency < 1:
+            raise ValueError("max_concurrency must be at least 1")
+        self._concurrency = threading.BoundedSemaphore(max_concurrency)
 
     def generate(self, request: ModelRequest) -> ModelResponse:
         key = self._cache_key(request)
@@ -50,9 +55,10 @@ class GuardedModelClient:
         try:
             # Reserve a conservative upper bound before the provider call.
             self.budget.reserve(estimate, estimated_cost)
-            response = retry_call(
-                lambda: self.client.generate(request), max_retries=self.max_retries
-            )
+            with self._concurrency:
+                response = retry_call(
+                    lambda: self.client.generate(request), max_retries=self.max_retries
+                )
         except Exception as exc:
             status = "BUDGET_EXCEEDED" if exc.__class__.__name__ == "BudgetExceeded" else None
             self.call_log.append(

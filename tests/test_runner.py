@@ -58,3 +58,15 @@ def test_run_manager_persists_resolved_config(tmp_path: Path) -> None:
         encoding="utf-8"
     )
     assert "max_cross_exam_rounds: 2" in content
+
+
+def test_run_manager_persists_explicit_api_mode(tmp_path: Path) -> None:
+    samples = build_fixture(tmp_path / "fixtures")
+    manager = RunManager(tmp_path / "outputs")
+
+    manager.run(samples[:1], CountingMethod(), run_id="api-run", mode="api")
+
+    metadata = json.loads(
+        (tmp_path / "outputs" / "api-run" / "run_metadata.json").read_text(encoding="utf-8")
+    )
+    assert metadata["mode"] == "api"
