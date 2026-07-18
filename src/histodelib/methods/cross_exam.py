@@ -7,6 +7,7 @@ from dataclasses import dataclass
 
 from histodelib.api.base import ModelClient
 from histodelib.api.response_parser import parse_json_object
+from histodelib.constants import JSON_RESPONSE_SCHEMA
 from histodelib.methods.probe import RelationProbeResult
 from histodelib.methods.reinspection import ReinspectionDecision
 from histodelib.schemas import ModelRequest, TokenUsage
@@ -57,13 +58,15 @@ class ControlledCrossExamination:
                     model=model_name,
                     system_prompt=(
                         "You are a controlled cross-examiner. Ask one concise question and "
-                        "return JSON with question, finding, and stop=true/false."
+                        "return JSON with question, finding, and stop=true/false. "
+                        "Output only valid JSON."
                     ),
                     user_prompt=(
                         f"Round {round_no + 1}; risk_flags={list(probe.risk_flags)}; "
                         f"targets={list(decision.targets)}"
                     ),
                     max_output_tokens=256,
+                    response_schema=dict(JSON_RESPONSE_SCHEMA),
                 )
             )
             parsed = parse_json_object(response.content)

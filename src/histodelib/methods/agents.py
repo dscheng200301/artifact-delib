@@ -10,7 +10,7 @@ from typing import Any
 
 from histodelib.api.base import ModelClient
 from histodelib.api.response_parser import parse_json_object
-from histodelib.constants import DEFAULT_MODEL
+from histodelib.constants import DEFAULT_MODEL, JSON_RESPONSE_SCHEMA, LABEL_JSON_INSTRUCTION
 from histodelib.prompts.loader import PromptSpec, load_prompt
 from histodelib.schemas import Label, ModelRequest, TokenUsage
 
@@ -43,13 +43,17 @@ class TextAgent:
                 request_id=str(uuid.uuid4()),
                 model=self.model_name,
                 system_prompt=(
-                    rendered.system_prompt
+                    f"{rendered.system_prompt} {LABEL_JSON_INSTRUCTION}"
                     if rendered
-                    else "You are Text Agent. Analyze only the supplied caption claim."
+                    else (
+                        "You are Text Agent. Analyze only the supplied caption claim. "
+                        f"{LABEL_JSON_INSTRUCTION}"
+                    )
                 ),
                 user_prompt=rendered.user_prompt if rendered else caption,
                 temperature=rendered.temperature if rendered else 0.0,
                 max_output_tokens=rendered.max_output_tokens if rendered else 512,
+                response_schema=dict(JSON_RESPONSE_SCHEMA),
             )
         )
         return AgentEvidence(
@@ -78,9 +82,12 @@ class ImageAgent:
                 request_id=str(uuid.uuid4()),
                 model=self.model_name,
                 system_prompt=(
-                    rendered.system_prompt
+                    f"{rendered.system_prompt} {LABEL_JSON_INSTRUCTION}"
                     if rendered
-                    else "You are Image Agent. Analyze only visible image evidence."
+                    else (
+                        "You are Image Agent. Analyze only visible image evidence. "
+                        f"{LABEL_JSON_INSTRUCTION}"
+                    )
                 ),
                 user_prompt=(
                     rendered.user_prompt
@@ -90,6 +97,7 @@ class ImageAgent:
                 image_base64=f"data:image/png;base64,{encoded}",
                 temperature=rendered.temperature if rendered else 0.0,
                 max_output_tokens=rendered.max_output_tokens if rendered else 512,
+                response_schema=dict(JSON_RESPONSE_SCHEMA),
             )
         )
         return AgentEvidence(

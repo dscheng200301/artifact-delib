@@ -5,6 +5,7 @@ from histodelib.settings import Settings
 
 def test_settings_fail_closed_for_paid_api_calls(tmp_path) -> None:
     settings = Settings(
+        _env_file=None,
         histodelib_data_root=tmp_path / "data",
         histodelib_output_root=tmp_path / "outputs",
         histodelib_cache_root=tmp_path / "cache",
@@ -17,6 +18,7 @@ def test_settings_fail_closed_for_paid_api_calls(tmp_path) -> None:
 
 def test_settings_redacts_configured_api_keys(tmp_path) -> None:
     settings = Settings(
+        _env_file=None,
         llm_api_key="secret-value",
         vlm_api_key="another-secret",
         histodelib_data_root=tmp_path / "data",

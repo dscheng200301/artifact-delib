@@ -129,9 +129,11 @@ def test_text_and_image_agents_keep_inputs_isolated(tmp_path: Path) -> None:
     )
 
     assert client.requests[0].image_base64 is None
+    assert client.requests[0].response_schema == {"type": "json_object"}
     assert client.requests[0].model == "qwen3.5-flash-2026-02-23"
     assert "caption only" in client.requests[0].user_prompt
     assert client.requests[1].image_base64 is not None
+    assert client.requests[1].response_schema == {"type": "json_object"}
     assert client.requests[1].model == "qwen3.5-flash-2026-02-23"
     assert "caption only" not in client.requests[1].user_prompt
 
@@ -194,6 +196,7 @@ def test_reinspection_api_calls_are_bounded_and_image_only(tmp_path: Path) -> No
     assert result.api_calls == 1
     assert client.requests[0].image_base64 is not None
     assert client.requests[0].model == "custom-model"
+    assert client.requests[0].response_schema == {"type": "json_object"}
 
 
 def test_cross_exam_api_rounds_respect_maximum(tmp_path: Path) -> None:
@@ -283,3 +286,5 @@ def test_baseline_protocols_use_declared_modalities(tmp_path: Path) -> None:
     create_baseline("direct_vlm", direct_client).run(sample)
     assert direct_client.requests[0].image_base64 is not None
     assert sample.caption in direct_client.requests[0].user_prompt
+    assert '"label"' in direct_client.requests[0].system_prompt
+    assert "MISCAPTIONED" in direct_client.requests[0].system_prompt

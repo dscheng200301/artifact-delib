@@ -8,6 +8,7 @@ from typing import Any, Literal
 
 from histodelib.api.base import ModelClient
 from histodelib.api.response_parser import parse_json_object
+from histodelib.constants import JSON_RESPONSE_SCHEMA
 from histodelib.schemas import Label, ModelRequest, TokenUsage
 
 
@@ -51,10 +52,11 @@ class DeferredJudge:
                 model=model_name,
                 system_prompt=(
                     "You are a deferred judge. Return JSON only with decision KEEP, REVISE, "
-                    "or ABSTAIN and an optional final_label."
+                    "or ABSTAIN and an optional final_label. Output only valid JSON."
                 ),
                 user_prompt=f"blind_label={blind_label}; evidence={evidence}",
                 max_output_tokens=256,
+                response_schema=dict(JSON_RESPONSE_SCHEMA),
             )
         )
         parsed = parse_json_object(response.content)

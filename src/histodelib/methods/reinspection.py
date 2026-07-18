@@ -9,6 +9,7 @@ from typing import Any
 
 from histodelib.api.base import ModelClient
 from histodelib.api.response_parser import parse_json_object
+from histodelib.constants import JSON_RESPONSE_SCHEMA
 from histodelib.methods.probe import RelationProbeResult
 from histodelib.schemas import ModelRequest, Sample, TokenUsage
 
@@ -66,11 +67,13 @@ class TargetedReinspection:
                     model=model_name,
                     system_prompt=(
                         "You are a targeted visual reinspection agent. Return concise JSON "
-                        "with label and evidence; inspect only the requested view."
+                        "with label and evidence; inspect only the requested view. "
+                        "Output only valid JSON."
                     ),
                     user_prompt=f"Reinspect view '{target}' for sample {sample.sample_id}.",
                     image_base64=f"data:image/png;base64,{encoded}",
                     max_output_tokens=256,
+                    response_schema=dict(JSON_RESPONSE_SCHEMA),
                 )
             )
             parsed = parse_json_object(response.content)

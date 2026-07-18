@@ -9,7 +9,7 @@ from typing import Protocol
 
 from histodelib.api.base import ModelClient
 from histodelib.api.response_parser import parse_json_object
-from histodelib.constants import DEFAULT_MODEL
+from histodelib.constants import DEFAULT_MODEL, JSON_RESPONSE_SCHEMA, LABEL_JSON_INSTRUCTION
 from histodelib.methods.histodelib import HistoDelibMethod
 from histodelib.methods.router import ApiRouter, RuleRouter
 from histodelib.schemas import Label, ModelRequest, Prediction, Sample, TokenUsage
@@ -201,9 +201,10 @@ def _build_request(
     return ModelRequest(
         request_id=str(uuid.uuid4()),
         model=model_name,
-        system_prompt=f"Baseline {name}, round {round_no}. {protocol}",
+        system_prompt=f"Baseline {name}, round {round_no}. {protocol} {LABEL_JSON_INSTRUCTION}",
         user_prompt=user_prompt,
         image_base64=image_base64,
+        response_schema=dict(JSON_RESPONSE_SCHEMA),
     )
 
 

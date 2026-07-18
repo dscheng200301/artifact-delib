@@ -45,6 +45,10 @@ class OpenAICompatibleClient:
             "temperature": request.temperature,
             "max_tokens": request.max_output_tokens,
         }
+        if request.response_schema is not None:
+            payload["response_format"] = request.response_schema
+            # DashScope JSON mode is incompatible with Qwen hybrid thinking mode.
+            payload["enable_thinking"] = False
         started = time.perf_counter()
         response = httpx.post(
             f"{self._base_url}/chat/completions",

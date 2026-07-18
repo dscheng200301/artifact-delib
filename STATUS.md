@@ -36,7 +36,7 @@ Existing `histo-delib`; no environment was created. The editable package install
 
 ## Tests
 
-- 66 passed; Ruff, mypy and pip check passed in `histo-delib`.
+- 67 passed; Ruff, mypy and pip check passed in `histo-delib`.
 
 ## Mock Smoke Test
 
@@ -44,11 +44,11 @@ Existing `histo-delib`; no environment was created. The editable package install
 
 ## Real API Smoke Test
 
-- COMPLETED transport smoke on `direct_vlm`: 12/12 DashScope-compatible calls returned, 0 transport errors, 10,224 tokens, estimated 0.0178848 CNY, cache misses only. All 12 predictions were `INSUFFICIENT_EVIDENCE` because the provider returned prose instead of parseable JSON; this is not a research result.
+- COMPLETED structured-output smoke on `direct_vlm`: 12/12 DashScope-compatible calls returned, 0 errors, 2,612 tokens, and all 12 predictions parsed successfully (`MISCAPTIONED=11`, `OUT_OF_CONTEXT=1`). Synthetic fixture only; not a research result.
 
 ## Current API Budget
 
-- Last smoke budget accounting: 12 requests and 10,224 tokens; formal data remains `NOT_SELECTED`.
+- Last smoke budget accounting: 12 requests and 2,612 tokens; formal data remains `NOT_SELECTED`.
 
 ## Dataset Status
 
@@ -56,7 +56,7 @@ Existing `histo-delib`; no environment was created. The editable package install
 
 ## Last Successful Command
 
-- `powershell -ExecutionPolicy Bypass -File .\\scripts\\run_qwen_smoke.ps1` (transport succeeded; structured-output parsing issue remains)
+- `conda run -n histo-delib python -m histodelib.cli run --mode api --method direct_vlm --config configs/api/default.yaml --output-root tmp/qwen-json-smoke3` (structured synthetic smoke passed)
 
 ## Last Failed Command
 
@@ -68,4 +68,4 @@ Existing `histo-delib`; no environment was created. The editable package install
 
 ## Next Executable Step
 
-- Fix and re-test structured JSON output enforcement for Qwen, then obtain data authorization, freeze prompts/models/API settings, run all baselines and ablations, and generate numbers only from structured artifacts.
+- Obtain data authorization, freeze prompts/models/API settings, run all baselines and ablations, and generate numbers only from structured artifacts.

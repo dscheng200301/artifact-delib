@@ -123,6 +123,40 @@ def test_openai_compatible_client_normalizes_http_response() -> None:
     assert response.provider == "openai_compatible"
 
 
+@respx.mock
+def test_openai_compatible_client_sends_json_response_format() -> None:
+    route = respx.post("https://example.test/v1/chat/completions").mock(
+        return_value=Response(
+            200,
+            json={
+                "choices": [{"message": {"content": '{"label":"TRUE"}'}}],
+                "usage": {"prompt_tokens": 1, "completion_tokens": 1},
+            },
+        )
+    )
+    client = OpenAICompatibleClient(
+        base_url="https://example.test/v1",
+        api_key="secret",
+        timeout_seconds=5,
+        allow_paid_calls=True,
+    )
+    client.generate(
+        ModelRequest(
+            request_id="req-json",
+            model="remote-model",
+            system_prompt="Return JSON only.",
+            user_prompt="caption",
+            response_schema={"type": "json_object"},
+        )
+    )
+
+    assert route.calls[0].request.content
+    assert route.calls[0].request.read().decode("utf-8")
+    payload = json.loads(route.calls[0].request.content)
+    assert payload["response_format"] == {"type": "json_object"}
+    assert payload["enable_thinking"] is False
+
+
 def test_call_log_redacts_authorization_and_cost_is_optional(tmp_path) -> None:
     assert "secret" not in redact_secrets("Authorization: Bearer secret")
     store = CallLogStore(tmp_path / "calls.jsonl")
