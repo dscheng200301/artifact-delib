@@ -1,5 +1,11 @@
 # Changelog
 
+## Unreleased - 2026-07-18
+
+- Added typed text/image evidence schemas, prompt provenance, safer relation probing, validated API-router fallback, deterministic image views, stateful bounded cross-examination, and explicit baseline protocol metadata.
+- Added run fingerprints that reject unsafe resume, sample-ID-safe metric pairing, image readability/hash/duplicate checks, group-aware statistics helpers, thread-safe budget reservation, retry-attempt audit records, and pricing provenance fields.
+- Formal datasets and formal experiments remain `NOT_SELECTED` / `NOT_RUN`; no paid API calls or research results were generated.
+
 ## 0.1.0 - 2026-07-17
 
 - Added `scripts/run_qwen_smoke.sh` for an explicit, guarded Qwen remote synthetic smoke run; it validates `.env` and the paid-call gate without printing credentials.

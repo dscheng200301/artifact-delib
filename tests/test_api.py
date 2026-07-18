@@ -308,3 +308,87 @@ def test_guarded_client_enforces_max_concurrency(tmp_path) -> None:
         list(pool.map(client.generate, requests))
 
     assert provider.max_active == 1
+
+
+def test_guarded_client_logs_each_retry_attempt(tmp_path) -> None:
+    class RetryingClient(MockModelClient):
+        def __init__(self) -> None:
+            super().__init__(role="retrying")
+            self.calls = 0
+
+        def generate(self, request):
+            self.calls += 1
+            if self.calls == 1:
+                raise TimeoutError("temporary")
+            return super().generate(request)
+
+    provider = RetryingClient()
+    client = GuardedModelClient(
+        provider,
+        cache=ResponseCache(tmp_path / "cache"),
+        budget=BudgetManager(max_requests=2, max_tokens=5000, max_cost=1.0),
+        call_log=CallLogStore(tmp_path / "calls.jsonl"),
+        max_retries=2,
+    )
+    request = ModelRequest(
+        request_id="req-retry-audit",
+        model="fixture-model",
+        system_prompt="Return JSON.",
+        user_prompt="caption",
+    )
+
+    client.generate(request)
+
+    records = [json.loads(line) for line in (tmp_path / "calls.jsonl").read_text().splitlines()]
+    assert len(records) == 2
+    assert [record["attempt_index"] for record in records] == [1, 2]
+    assert records[0]["error_type"] == "TimeoutError"
+    assert records[1]["status"] == "COMPLETED"
+
+
+def test_budget_reservation_is_thread_safe() -> None:
+    budget = BudgetManager(max_requests=5, max_tokens=100, max_cost=5.0)
+
+    def reserve_once() -> bool:
+        try:
+            budget.reserve(TokenUsage(input_tokens=1, output_tokens=1), 0.01)
+            return True
+        except BudgetExceeded:
+            return False
+
+    with ThreadPoolExecutor(max_workers=20) as pool:
+        outcomes = list(pool.map(lambda _: reserve_once(), range(20)))
+
+    assert sum(outcomes) == 5
+    assert budget.requests == 5
+
+
+def test_guarded_call_log_preserves_pricing_provenance(tmp_path) -> None:
+    client = GuardedModelClient(
+        MockModelClient(role="priced"),
+        cache=ResponseCache(tmp_path / "cache"),
+        budget=BudgetManager(max_requests=1, max_tokens=1000, max_cost=1.0),
+        call_log=CallLogStore(tmp_path / "calls.jsonl"),
+        pricing={
+            "currency": "CNY",
+            "region": "mainland_china",
+            "source": "local-pricing",
+            "last_verified": "2026-07-18",
+            "version": "pricing-v1",
+            "input_per_million": 0.2,
+            "output_per_million": 2.0,
+        },
+    )
+    client.generate(
+        ModelRequest(
+            request_id="req-priced",
+            model="fixture-model",
+            system_prompt="Return JSON.",
+            user_prompt="caption",
+        )
+    )
+
+    record = json.loads((tmp_path / "calls.jsonl").read_text().splitlines()[0])
+    assert record["currency"] == "CNY"
+    assert record["pricing_version"] == "pricing-v1"
+    assert record["pricing_region"] == "mainland_china"

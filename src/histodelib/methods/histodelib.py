@@ -12,7 +12,7 @@ from histodelib.methods.judge import DeferredJudge
 from histodelib.methods.probe import LightRelationProbe
 from histodelib.methods.reinspection import TargetedReinspection
 from histodelib.methods.router import Router
-from histodelib.schemas import Prediction, Sample, TokenUsage
+from histodelib.schemas import ImageEvidence, Prediction, Sample, TextEvidence, TokenUsage
 
 
 class HistoDelibMethod:
@@ -45,15 +45,33 @@ class HistoDelibMethod:
         )
         text_label = text_evidence.label
         image_label = image_evidence.label
+        text_structured = text_evidence.structured
+        image_structured = image_evidence.structured
+        if not isinstance(text_structured, TextEvidence) or not isinstance(
+            image_structured, ImageEvidence
+        ):
+            raise TypeError("modal agents returned mismatched evidence types")
+        text_probe = {
+            "label": text_label.value if text_label else None,
+            "claims": list(text_structured.caption_claims),
+            "requires_visible_text": text_structured.requires_visible_text,
+        }
+        image_probe = {
+            "label": image_label.value if image_label else None,
+            "visible_text": image_structured.visible_text,
+            "region_candidates": image_structured.region_candidates,
+        }
         probe = LightRelationProbe().assess(
-            {"label": text_label.value if text_label else None, "claims": [sample.caption]},
-            {"label": image_label.value if image_label else None},
+            text_probe,
+            image_probe,
         )
         reinspection = TargetedReinspection().select(probe)
         route = self.router.route({"risk_flags": list(probe.risk_flags)})
         evidence_for_judge: dict[str, Any] = {
             "text_label": text_label,
             "image_label": image_label,
+            "text_evidence": text_structured.model_dump(mode="json"),
+            "image_evidence": image_structured.model_dump(mode="json"),
         }
         if self.enable_api_deliberation and route.reinspect:
             reinspection_result = TargetedReinspection().inspect(
@@ -111,11 +129,36 @@ class HistoDelibMethod:
                 "text_label": text_label.value if text_label else None,
                 "image_label": image_label.value if image_label else None,
                 "route": route.reason,
+                "route_action": route.action,
+                "route_source": route.source,
+                "route_reason_codes": route.reason_codes,
+                "route_disagreement": route.disagreement,
                 "reinspection_targets": route.reinspection_targets,
                 "probe_flags": probe.risk_flags,
                 "cross_exam_rounds": cross_exam.rounds,
                 "cross_exam_stop_reason": cross_exam.stop_reason,
+                "cross_exam_state": (
+                    {
+                        "initial_disagreement": cross_exam.state.initial_disagreement,
+                        "rounds": [
+                            {
+                                "round_no": turn.round_no,
+                                "question": turn.question,
+                                "respondent": turn.respondent,
+                                "answer": turn.answer,
+                                "cited_evidence_ids": turn.cited_evidence_ids,
+                                "resolved": turn.resolved,
+                            }
+                            for turn in (cross_exam.state.rounds if cross_exam.state else ())
+                        ],
+                        "stop_reason": cross_exam.state.stop_reason,
+                    }
+                    if cross_exam.state
+                    else None
+                ),
                 "judge_decision": judged.decision,
+                "judge_fallback_reason": judged.fallback_reason,
+                "judge_schema_version": judged.schema_version,
                 "reinspection_api_calls": (
                     reinspection_result.api_calls if reinspection_result else 0
                 ),

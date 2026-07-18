@@ -45,7 +45,7 @@ class GuardedModelClient:
         cached_payload = self._read_cache(key)
         if cached_payload is not None:
             response = ModelResponse.model_validate(cached_payload)
-            self._record(response, cache_state="hit")
+            self._record(response, cache_state="hit", attempt_index=0, request=request)
             return response
 
         estimate = self._estimate(request)
@@ -56,26 +56,68 @@ class GuardedModelClient:
             # Reserve a conservative upper bound before the provider call.
             self.budget.reserve(estimate, estimated_cost)
             with self._concurrency:
+                attempt_errors: list[tuple[Exception, int]] = []
+
+                def record_attempt_error(exc: Exception, attempt_index: int) -> None:
+                    attempt_errors.append((exc, attempt_index))
+                    self.call_log.append(
+                        {
+                            "request_id": request.request_id,
+                            "logical_request_id": request.request_id,
+                            "attempt_index": attempt_index,
+                            "provider": "unknown",
+                            "model": request.model,
+                            "prompt_name": request.prompt_name,
+                            "prompt_version": request.prompt_version,
+                            "prompt_content_hash": request.prompt_content_hash,
+                            "input_tokens": 0,
+                            "output_tokens": 0,
+                            "total_tokens": 0,
+                            "latency_ms": 0.0,
+                            "estimated_cost": 0.0,
+                            **self._pricing_metadata(),
+                            "cache_state": "miss",
+                            "error_type": type(exc).__name__,
+                            "retry_decision": (
+                                "retrying" if attempt_index < self.max_retries else "stop"
+                            ),
+                            "status": "RETRYING" if attempt_index < self.max_retries else "FAILED",
+                        }
+                    )
+
                 response = retry_call(
-                    lambda: self.client.generate(request), max_retries=self.max_retries
+                    lambda: self.client.generate(request),
+                    max_retries=self.max_retries,
+                    on_error=record_attempt_error,
                 )
         except Exception as exc:
-            status = "BUDGET_EXCEEDED" if exc.__class__.__name__ == "BudgetExceeded" else None
-            self.call_log.append(
-                {
-                    "request_id": request.request_id,
-                    "provider": "unknown",
-                    "model": request.model,
-                    "cache_state": "miss",
-                    "error_type": type(exc).__name__,
-                    "status": status,
-                    "latency_ms": 0.0,
-                }
-            )
+            if exc.__class__.__name__ == "BudgetExceeded":
+                self.call_log.append(
+                    {
+                        "request_id": request.request_id,
+                        "logical_request_id": request.request_id,
+                        "attempt_index": 0,
+                        "provider": "unknown",
+                        "model": request.model,
+                        "prompt_name": request.prompt_name,
+                        "prompt_version": request.prompt_version,
+                        "prompt_content_hash": request.prompt_content_hash,
+                        "cache_state": "miss",
+                        "error_type": type(exc).__name__,
+                        "status": "BUDGET_EXCEEDED",
+                        "latency_ms": 0.0,
+                        **self._pricing_metadata(),
+                    }
+                )
             raise
 
         self._write_cache(key, response)
-        self._record(response, cache_state="miss")
+        self._record(
+            response,
+            cache_state="miss",
+            attempt_index=len(attempt_errors) + 1,
+            request=request,
+        )
         return response
 
     @staticmethod
@@ -102,6 +144,9 @@ class GuardedModelClient:
             "temperature": request.temperature,
             "max_output_tokens": request.max_output_tokens,
             "response_schema": request.response_schema,
+            "prompt_name": request.prompt_name,
+            "prompt_version": request.prompt_version,
+            "prompt_content_hash": request.prompt_content_hash,
         }
         encoded = json.dumps(identity, ensure_ascii=False, sort_keys=True).encode("utf-8")
         return hashlib.sha256(encoded).hexdigest()
@@ -117,7 +162,13 @@ class GuardedModelClient:
         # Use the cache's lock and validation path without invoking the provider twice.
         self.cache.get_or_set(key, lambda: response.model_dump(mode="json"))
 
-    def _record(self, response: ModelResponse, cache_state: str) -> None:
+    def _record(
+        self,
+        response: ModelResponse,
+        cache_state: str,
+        attempt_index: int = 1,
+        request: ModelRequest | None = None,
+    ) -> None:
         record = self.accounting.record(
             response.request_id,
             response.usage.input_tokens,
@@ -127,8 +178,13 @@ class GuardedModelClient:
         self.call_log.append(
             {
                 "request_id": response.request_id,
+                "logical_request_id": response.request_id,
+                "attempt_index": attempt_index,
                 "provider": response.provider,
                 "model": response.model,
+                "prompt_name": request.prompt_name if request else None,
+                "prompt_version": request.prompt_version if request else None,
+                "prompt_content_hash": request.prompt_content_hash if request else None,
                 "input_tokens": record.input_tokens,
                 "output_tokens": record.output_tokens,
                 "total_tokens": record.total_tokens,
@@ -136,8 +192,20 @@ class GuardedModelClient:
                 "estimated_cost": estimate_cost(
                     record.input_tokens, record.output_tokens, self.pricing
                 ),
+                **self._pricing_metadata(),
                 "cache_state": cache_state,
                 "error_type": None,
                 "status": "COMPLETED",
+                "retry_decision": "success",
             }
         )
+
+    def _pricing_metadata(self) -> dict[str, object]:
+        pricing = self.pricing or {}
+        return {
+            "currency": pricing.get("currency", "unknown"),
+            "pricing_version": pricing.get("version", "unknown"),
+            "pricing_region": pricing.get("region", "unknown"),
+            "pricing_source": pricing.get("source", "unknown"),
+            "pricing_verified_at": pricing.get("last_verified", "unknown"),
+        }

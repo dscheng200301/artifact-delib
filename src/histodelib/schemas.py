@@ -31,6 +31,63 @@ class TokenUsage(BaseModel):
         return self.input_tokens + self.output_tokens
 
 
+class PromptProvenance(BaseModel):
+    """Immutable identity of the versioned prompt used for evidence extraction."""
+
+    model_config = ConfigDict(frozen=True)
+
+    name: str = Field(min_length=1)
+    version: str = Field(min_length=1)
+    content_hash: str = Field(min_length=1)
+
+
+class TextEvidence(BaseModel):
+    """Claims extracted from caption text without inspecting the image."""
+
+    model_config = ConfigDict(frozen=True)
+
+    evidence_id: str = Field(min_length=1)
+    entities: tuple[str, ...] = ()
+    event: str | None = None
+    location: str | None = None
+    date: str | None = None
+    caption_claims: tuple[str, ...] = ()
+    requires_visible_text: bool = False
+    uncertainty: tuple[str, ...] = ()
+    candidate_label: Label | None = None
+    prompt: PromptProvenance
+
+
+class ImageEvidence(BaseModel):
+    """Visible facts extracted from an image without inspecting the caption."""
+
+    model_config = ConfigDict(frozen=True)
+
+    evidence_id: str = Field(min_length=1)
+    visible_entities: tuple[str, ...] = ()
+    visible_scene: tuple[str, ...] = ()
+    visible_text: str | None = None
+    temporal_cues: tuple[str, ...] = ()
+    location_cues: tuple[str, ...] = ()
+    region_candidates: tuple[tuple[float, float, float, float], ...] = ()
+    uncertainty: tuple[str, ...] = ()
+    candidate_label: Label | None = None
+    prompt: PromptProvenance
+
+
+class ClaimFactPair(BaseModel):
+    """Explicit alignment between one caption claim and one visual fact."""
+
+    model_config = ConfigDict(frozen=True)
+
+    claim: str = Field(min_length=1)
+    visual_fact: str | None = None
+    relation: Literal["supported", "contradicted", "uncertain", "missing"]
+    conflict_type: str | None = None
+    confidence: float | None = Field(default=None, ge=0.0, le=1.0)
+    evidence_ids: tuple[str, ...] = ()
+
+
 class Sample(BaseModel):
     """A single image-caption verification input."""
 
@@ -45,6 +102,13 @@ class Sample(BaseModel):
     license: str | None = None
     domain: str | None = None
     conflict_type: str | None = None
+    data_version: str | None = None
+    annotation_version: str | None = None
+    annotator_ids: tuple[str, ...] = ()
+    adjudication_status: str | None = None
+    caption_source: str | None = None
+    label_rationale: str | None = None
+    image_sha256: str | None = None
     split: Literal["train", "validation", "test", "fixture", "unassigned"] | None = None
     fixture_markers: set[str] = Field(default_factory=set)
 
@@ -74,6 +138,9 @@ class ModelRequest(BaseModel):
     temperature: float = Field(default=0.0, ge=0.0, le=2.0)
     max_output_tokens: int = Field(default=512, ge=1)
     response_schema: dict[str, Any] | None = None
+    prompt_name: str | None = None
+    prompt_version: str | None = None
+    prompt_content_hash: str | None = None
 
 
 class ModelResponse(BaseModel):
@@ -118,3 +185,4 @@ class Prediction(BaseModel):
     evidence: dict[str, Any] = Field(default_factory=dict)
     usage: TokenUsage = Field(default_factory=TokenUsage)
     api_calls: int = Field(default=0, ge=0)
+    run_fingerprint: str | None = None
