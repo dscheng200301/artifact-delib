@@ -64,7 +64,7 @@ Existing `histo-delib`; no environment was created. The editable package install
 
 ## Current Git Commit
 
-- Latest commits: `feat: complete guarded qwen deliberation runtime`; `chore: add guarded qwen smoke script`.
+- Latest commits: `feat: complete guarded qwen deliberation runtime`; guarded Qwen smoke entrypoints for Bash and PowerShell.
 
 ## Next Executable Step
 
