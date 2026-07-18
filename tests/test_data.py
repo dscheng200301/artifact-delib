@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
+from histodelib.data.deduplication import find_exact_duplicates, find_perceptual_duplicates
 from histodelib.data.fixture_builder import build_fixture
 from histodelib.data.importer import import_manifest
 from histodelib.data.leakage import find_group_leakage
@@ -59,7 +60,21 @@ def test_group_leakage_flags_group_in_multiple_splits(tmp_path: Path) -> None:
     )
     second = first.model_copy(update={"sample_id": "two", "split": "test"})
 
-    assert find_group_leakage([first, second]) == {"same-original": {"train", "test"}}
+    leakage = find_group_leakage([first, second])
+    assert leakage["same-original"] == {"train", "test"}
+    assert leakage["caption:one"] == {"train", "test"}
+
+
+def test_group_leakage_flags_same_image_hash_across_splits(tmp_path: Path) -> None:
+    samples = build_fixture(tmp_path)
+    first = samples[0].model_copy(update={"split": "train", "original_group_id": "g1"})
+    second = samples[0].model_copy(
+        update={"sample_id": "other", "split": "test", "original_group_id": "g2"}
+    )
+
+    leakage = find_group_leakage([first, second])
+
+    assert any(set(splits) == {"train", "test"} for splits in leakage.values())
 
 
 def test_manifest_import_and_group_aware_split(tmp_path: Path) -> None:
@@ -92,3 +107,41 @@ def test_manifest_import_rejects_path_escape(tmp_path: Path) -> None:
         assert "outside image root" in str(exc)
     else:
         raise AssertionError("path traversal should be rejected")
+
+
+def test_validator_rejects_existing_but_unreadable_image(tmp_path: Path) -> None:
+    broken = tmp_path / "broken.png"
+    broken.write_bytes(b"not-an-image")
+    sample = Sample(sample_id="broken", image_path=broken, caption="caption")
+
+    report = validate_samples([sample])
+
+    assert report.is_valid is False
+    assert any("image is unreadable" in error for error in report.errors)
+
+
+def test_manifest_import_preserves_data_provenance_fields(tmp_path: Path) -> None:
+    sample = build_fixture(tmp_path)[0]
+    manifest = tmp_path / "manifest.csv"
+    manifest.write_text(
+        "sample_id,image_path,caption,label,data_version,annotation_version,caption_source\n"
+        f"{sample.sample_id},{sample.image_path.name},caption,TRUE,d1,a2,archive\n",
+        encoding="utf-8",
+    )
+
+    imported = import_manifest(manifest, tmp_path / "images")
+
+    assert imported[0].data_version == "d1"
+    assert imported[0].annotation_version == "a2"
+    assert imported[0].caption_source == "archive"
+
+
+def test_duplicate_checks_group_identical_images(tmp_path: Path) -> None:
+    samples = build_fixture(tmp_path)
+    duplicate = samples[0].model_copy(update={"sample_id": "duplicate-image"})
+
+    exact = find_exact_duplicates([samples[0], duplicate])
+    perceptual = find_perceptual_duplicates([samples[0], duplicate])
+
+    assert any(set(ids) == {samples[0].sample_id, duplicate.sample_id} for ids in exact.values())
+    assert perceptual

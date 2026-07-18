@@ -69,6 +69,37 @@ def test_metrics_include_token_saving_correction_and_harm() -> None:
     assert metrics.harm_rate == 1.0
 
 
+def test_metrics_pair_predictions_and_baseline_by_sample_id() -> None:
+    predictions = [
+        Prediction(
+            sample_id="missing-label",
+            method="adaptive",
+            final_label=Label.TRUE,
+            usage=TokenUsage(input_tokens=1, output_tokens=0),
+        ),
+        Prediction(
+            sample_id="kept",
+            method="adaptive",
+            final_label=Label.MISCAPTIONED,
+            usage=TokenUsage(input_tokens=9, output_tokens=0),
+        ),
+    ]
+    baseline = [
+        Prediction(
+            sample_id="kept",
+            method="full",
+            final_label=Label.MISCAPTIONED,
+            usage=TokenUsage(input_tokens=18, output_tokens=0),
+        )
+    ]
+
+    metrics = compute_metrics(predictions, {"kept": Label.MISCAPTIONED}, baseline)
+
+    assert metrics.accuracy == 1.0
+    assert metrics.average_tokens == 9
+    assert metrics.token_saving == 0.5
+
+
 def test_fixture_cli_builds_and_validates_synthetic_data(tmp_path: Path) -> None:
     runner = CliRunner()
 

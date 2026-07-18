@@ -13,7 +13,7 @@ from histodelib.methods.probe import LightRelationProbe
 from histodelib.methods.reinspection import TargetedReinspection
 from histodelib.methods.router import ApiRouter, RuleRouter
 from histodelib.prompts.loader import load_prompt
-from histodelib.schemas import Label
+from histodelib.schemas import Label, ModelResponse, TokenUsage
 
 
 def test_rule_router_only_escalates_when_probe_has_risk() -> None:
@@ -31,7 +31,46 @@ def test_api_router_returns_schema_validated_route() -> None:
     decision = router.route({"risk_flags": ["modality_disagreement"]})
 
     assert decision.reinspect is True
-    assert decision.reason.startswith("api:")
+    assert decision.source == "fallback"
+    assert "ROUTER_PARSE_FAILURE" in decision.reason_codes
+
+
+def test_api_router_uses_valid_api_decision_and_preserves_source() -> None:
+    class RoutingClient:
+        def generate(self, request):
+            return ModelResponse(
+                request_id=request.request_id,
+                content='{"action":"ACCEPT","targets":[],"confidence":0.9,"reason_codes":["stable"]}',
+                usage=TokenUsage(input_tokens=1, output_tokens=1),
+                provider="fake",
+                model=request.model,
+            )
+
+    decision = ApiRouter(RoutingClient()).route({"risk_flags": []})
+
+    assert decision.action == "ACCEPT"
+    assert decision.source == "api"
+    assert decision.reinspect is False
+
+
+def test_api_router_records_parse_failure_and_falls_back() -> None:
+    class InvalidRoutingClient:
+        def generate(self, request):
+            return ModelResponse(
+                request_id=request.request_id,
+                content='{"action":"REINSPECT","targets":["not-allowed"]}',
+                usage=TokenUsage(input_tokens=1, output_tokens=1),
+                provider="fake",
+                model=request.model,
+            )
+
+    decision = ApiRouter(InvalidRoutingClient()).route(
+        {"risk_flags": ["modality_disagreement"]}
+    )
+
+    assert decision.source == "fallback"
+    assert "ROUTER_PARSE_FAILURE" in decision.reason_codes
+    assert decision.reinspect is True
 
 
 def test_histodelib_api_router_counts_router_call(tmp_path: Path) -> None:
@@ -150,6 +189,8 @@ def test_text_and_image_agents_keep_inputs_isolated(tmp_path: Path) -> None:
 
     assert client.requests[0].image_base64 is None
     assert client.requests[0].response_schema == {"type": "json_object"}
+    assert client.requests[0].prompt_name == "text_agent"
+    assert client.requests[0].prompt_content_hash
     assert client.requests[0].model == "qwen3.5-flash-2026-02-23"
     assert "caption only" in client.requests[0].user_prompt
     assert client.requests[1].image_base64 is not None
@@ -177,6 +218,21 @@ def test_agents_use_explicit_model_name(tmp_path: Path) -> None:
     assert [request.model for request in client.requests] == ["custom-model", "custom-model"]
 
 
+def test_modal_agents_return_typed_single_modality_evidence(tmp_path: Path) -> None:
+    image_path = build_fixture(tmp_path)[0].image_path
+    client = MockModelClient(role="agent")
+
+    text_result = TextAgent(client).analyze("A harbor in 1912")
+    image_result = ImageAgent(client).analyze(image_path)
+
+    assert text_result.modality == "text"
+    assert text_result.structured.evidence_id
+    assert text_result.structured.caption_claims == ("A harbor in 1912",)
+    assert image_result.modality == "image"
+    assert image_result.structured.evidence_id
+    assert image_result.structured.visible_text is None
+
+
 def test_probe_reinspection_and_cross_exam_are_bounded() -> None:
     probe = LightRelationProbe().assess(
         {"label": "TRUE", "claims": ["1912"]},
@@ -189,6 +245,24 @@ def test_probe_reinspection_and_cross_exam_are_bounded() -> None:
     assert decision.targets
     assert result.rounds <= 2
     assert result.stop_reason in {"stable", "max_rounds", "abstain"}
+
+
+def test_probe_does_not_treat_missing_visible_text_as_unreadable_glyph() -> None:
+    result = LightRelationProbe().assess(
+        {"label": "TRUE", "claims": ["A harbor in 1912"]},
+        {"label": "TRUE", "visible_text": None},
+    )
+
+    assert "unreadable_glyph" not in result.risk_flags
+
+
+def test_probe_flags_unreadable_text_only_when_text_evidence_requires_it() -> None:
+    result = LightRelationProbe().assess(
+        {"label": "TRUE", "claims": ["A sign reads 'Harbor'"], "requires_visible_text": True},
+        {"label": "TRUE", "visible_text": None},
+    )
+
+    assert "unreadable_glyph" in result.risk_flags
 
 
 def test_reinspection_api_calls_are_bounded_and_image_only(tmp_path: Path) -> None:
@@ -217,6 +291,7 @@ def test_reinspection_api_calls_are_bounded_and_image_only(tmp_path: Path) -> No
     assert client.requests[0].image_base64 is not None
     assert client.requests[0].model == "custom-model"
     assert client.requests[0].response_schema == {"type": "json_object"}
+    assert result.evidence[0]["view"]["reason_code"] == "target_unavailable_full_fallback"
 
 
 def test_cross_exam_api_rounds_respect_maximum(tmp_path: Path) -> None:
@@ -230,6 +305,31 @@ def test_cross_exam_api_rounds_respect_maximum(tmp_path: Path) -> None:
     )
 
     assert 0 <= result.api_calls <= 2
+
+
+def test_cross_exam_state_carries_prior_transcript_between_rounds(tmp_path: Path) -> None:
+    probe = LightRelationProbe().assess(
+        {"label": "TRUE", "claims": ["caption"]}, {"label": "MISCAPTIONED"}
+    )
+    decision = TargetedReinspection().select(probe)
+
+    class RecordingClient(MockModelClient):
+        def __init__(self) -> None:
+            super().__init__(role="critic")
+            self.prompts: list[str] = []
+
+        def generate(self, request):
+            self.prompts.append(request.user_prompt)
+            return super().generate(request)
+
+    client = RecordingClient()
+    result = ControlledCrossExamination(max_rounds=2).run_with_client(
+        client, probe, decision, model_name="custom-model"
+    )
+
+    assert result.state is not None
+    assert len(result.state.rounds) == 2
+    assert "prior_transcript" in client.prompts[1]
 
 
 def test_deferred_judge_api_path_returns_structured_decision() -> None:
@@ -262,6 +362,34 @@ def test_baseline_factory_exposes_named_api_only_protocols(tmp_path: Path) -> No
     assert (
         create_baseline("generic_mad", MockModelClient(role="baseline")).run(sample).api_calls == 4
     )
+
+
+def test_baseline_predictions_expose_protocol_provenance(tmp_path: Path) -> None:
+    sample = build_fixture(tmp_path)[0]
+
+    prediction = create_baseline("self_reflection", MockModelClient(role="baseline")).run(sample)
+
+    assert prediction.evidence["protocol"]["name"] == "self_reflection"
+    assert "engineering_approximation" in prediction.evidence["protocol"]
+
+
+def test_self_reflection_receives_prior_structured_answer(tmp_path: Path) -> None:
+    sample = build_fixture(tmp_path)[0]
+
+    class RecordingClient(MockModelClient):
+        def __init__(self) -> None:
+            super().__init__(role="baseline")
+            self.requests = []
+
+        def generate(self, request):
+            self.requests.append(request)
+            return super().generate(request)
+
+    client = RecordingClient()
+    create_baseline("self_reflection", client).run(sample)
+
+    assert len(client.requests) == 2
+    assert "prior_answer=" in client.requests[1].user_prompt
 
 
 def test_baseline_factory_passes_configured_model_name(tmp_path: Path) -> None:

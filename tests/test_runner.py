@@ -70,3 +70,22 @@ def test_run_manager_persists_explicit_api_mode(tmp_path: Path) -> None:
         (tmp_path / "outputs" / "api-run" / "run_metadata.json").read_text(encoding="utf-8")
     )
     assert metadata["mode"] == "api"
+
+
+def test_run_manager_rejects_changed_fingerprint_on_resume(tmp_path: Path) -> None:
+    samples = build_fixture(tmp_path / "fixtures")
+    manager = RunManager(tmp_path / "outputs")
+
+    manager.run(samples[:1], CountingMethod(), run_id="fingerprinted", resolved_config={"seed": 1})
+
+    try:
+        manager.run(
+            samples[:1],
+            CountingMethod(),
+            run_id="fingerprinted",
+            resolved_config={"seed": 2},
+        )
+    except ValueError as exc:
+        assert "fingerprint" in str(exc)
+    else:
+        raise AssertionError("changed run configuration must not resume old predictions")

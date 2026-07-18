@@ -5,6 +5,7 @@ from __future__ import annotations
 import base64
 import uuid
 from collections import Counter
+from dataclasses import dataclass
 from typing import Protocol
 
 from histodelib.api.base import ModelClient
@@ -35,6 +36,62 @@ class VerificationMethod(Protocol):
         """Run one method on one sample."""
 
 
+@dataclass(frozen=True)
+class BaselineProtocol:
+    """Declared information schedule for a named comparison method."""
+
+    name: str
+    engineering_approximation: bool
+    exact_prompt: str
+    information_schedule: tuple[str, ...]
+    calls: int
+    temperature: float
+    seed: int | None
+    aggregation_rule: str
+    stopping_rule: str
+    source_reference: str | None = None
+    adaptation_notes: str = "No external reference verified in this phase."
+
+    def as_dict(self) -> dict[str, object]:
+        return {
+            "name": self.name,
+            "engineering_approximation": self.engineering_approximation,
+            "exact_prompt": self.exact_prompt,
+            "information_schedule": self.information_schedule,
+            "calls": self.calls,
+            "temperature": self.temperature,
+            "seed": self.seed,
+            "aggregation_rule": self.aggregation_rule,
+            "stopping_rule": self.stopping_rule,
+            "source_reference": self.source_reference,
+            "adaptation_notes": self.adaptation_notes,
+        }
+
+
+def baseline_protocol(name: str) -> BaselineProtocol:
+    """Return the explicit, non-fabricated protocol declaration for ``name``."""
+
+    calls = {
+        "self_consistency": 3,
+        "self_reflection": 2,
+        "sequential_context_veracity": 2,
+        "fixed_multi_perspective": 3,
+        "generic_mad": 4,
+        "always_full": 6,
+    }.get(name, 1)
+    return BaselineProtocol(
+        name=name,
+        engineering_approximation=True,
+        exact_prompt=f"Baseline {name}: return one structured label per declared stage.",
+        information_schedule=("caption", "image", "caption+image"),
+        calls=calls,
+        temperature=0.0,
+        seed=None,
+        aggregation_rule="majority_vote" if calls > 1 else "single_response",
+        stopping_rule="fixed_call_count",
+    )
+
+
 class SingleCallBaseline:
     def __init__(
         self,
@@ -59,6 +116,7 @@ class SingleCallBaseline:
             final_label=label,
             initial_label=label,
             status="COMPLETED" if label else "INSUFFICIENT_EVIDENCE",
+            evidence={"protocol": baseline_protocol(self.name).as_dict()},
             usage=response.usage,
             api_calls=1,
         )
@@ -82,6 +140,7 @@ class RepeatedBaseline:
     def run(self, sample: Sample) -> Prediction:
         labels: list[Label] = []
         usage = TokenUsage()
+        prior_answer: str | None = None
         for _ in range(self.calls):
             response = self.client.generate(
                 _build_request(
@@ -90,8 +149,10 @@ class RepeatedBaseline:
                     sample,
                     self.input_mode,
                     round_no=len(labels),
+                    prior_answer=prior_answer,
                 )
             )
+            prior_answer = response.content
             label = _read_label(response.content)
             if label is not None:
                 labels.append(label)
@@ -106,6 +167,7 @@ class RepeatedBaseline:
             final_label=final,
             initial_label=labels[0] if labels else None,
             status="COMPLETED" if final else "INSUFFICIENT_EVIDENCE",
+            evidence={"protocol": baseline_protocol(self.name).as_dict()},
             usage=usage,
             api_calls=self.calls,
         )
@@ -172,6 +234,7 @@ def _build_request(
     input_mode: str,
     *,
     round_no: int = 0,
+    prior_answer: str | None = None,
 ) -> ModelRequest:
     if input_mode == "full_schedule":
         input_mode = ("text", "image", "image_and_text", "image", "text", "image_and_text")[
@@ -198,6 +261,12 @@ def _build_request(
         "generic_mad": "Act as one independent debate member.",
         "always_full": "Execute the configured full protocol stage.",
     }.get(name, "Return a JSON label.")
+    if prior_answer and name in {
+        "self_reflection",
+        "sequential_context_veracity",
+        "generic_mad",
+    }:
+        user_prompt = f"prior_answer={prior_answer}\n{user_prompt}"
     return ModelRequest(
         request_id=str(uuid.uuid4()),
         model=model_name,

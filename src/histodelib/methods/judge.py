@@ -18,6 +18,8 @@ class JudgeResult:
     final_label: Label | None
     usage: TokenUsage = TokenUsage()
     api_calls: int = 0
+    fallback_reason: str | None = None
+    schema_version: str = "judge-v1"
 
 
 class DeferredJudge:
@@ -74,7 +76,13 @@ class DeferredJudge:
             candidate = evidence_labels[0]
         if candidate is None:
             fallback = self.adjudicate(blind_label, evidence)
-            return JudgeResult(fallback.decision, fallback.final_label, response.usage, 1)
+            return JudgeResult(
+                fallback.decision,
+                fallback.final_label,
+                response.usage,
+                1,
+                fallback_reason="JUDGE_PARSE_FAILURE_FALLBACK",
+            )
         decision: Literal["KEEP", "REVISE"] = "KEEP" if candidate == blind_label else "REVISE"
         return JudgeResult(decision, candidate, response.usage, 1)
 

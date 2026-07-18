@@ -5,18 +5,20 @@ from __future__ import annotations
 import base64
 import uuid
 from dataclasses import dataclass
-from typing import Any
+from typing import Any, Literal
 
 from histodelib.api.base import ModelClient
 from histodelib.api.response_parser import parse_json_object
 from histodelib.constants import JSON_RESPONSE_SCHEMA
 from histodelib.methods.probe import RelationProbeResult
 from histodelib.schemas import ModelRequest, Sample, TokenUsage
+from histodelib.vision.views import BBox, create_view
 
 
 @dataclass(frozen=True)
 class ReinspectionDecision:
     targets: tuple[str, ...]
+    region_candidates: tuple[tuple[float, float, float, float], ...] = ()
 
 
 @dataclass(frozen=True)
@@ -41,7 +43,7 @@ class TargetedReinspection:
         targets = tuple(
             dict.fromkeys(self._TARGETS[flag] for flag in probe.risk_flags if flag in self._TARGETS)
         )
-        return ReinspectionDecision(targets)
+        return ReinspectionDecision(targets, probe.region_candidates)
 
     def inspect(
         self,
@@ -57,10 +59,23 @@ class TargetedReinspection:
         targets = decision.targets[: max(0, max_targets)]
         if not targets:
             return ReinspectionResult(())
-        encoded = base64.b64encode(sample.image_path.read_bytes()).decode("ascii")
         records: list[dict[str, Any]] = []
         input_tokens = output_tokens = 0
         for target in targets:
+            bbox = _first_bbox(decision.region_candidates)
+            target_name: Literal["full", "patch", "glyph", "panor"] = "full"
+            if target == "patch":
+                target_name = "patch"
+            elif target == "glyph":
+                target_name = "glyph"
+            elif target == "panor":
+                target_name = "panor"
+            view = create_view(
+                sample.image_path,
+                target=target_name,
+                bbox=bbox,
+            )
+            encoded = base64.b64encode(view.data).decode("ascii")
             response = client.generate(
                 ModelRequest(
                     request_id=str(uuid.uuid4()),
@@ -77,7 +92,20 @@ class TargetedReinspection:
                 )
             )
             parsed = parse_json_object(response.content)
-            records.append({"target": target, "response": parsed or {"raw": response.content}})
+            records.append(
+                {
+                    "target": target,
+                    "response": parsed or {"raw": response.content},
+                    "view": {
+                        "source_sha256": view.source_sha256,
+                        "view_sha256": view.view_sha256,
+                        "bbox": view.bbox,
+                        "scale": view.scale,
+                        "generation_version": view.generation_version,
+                        "reason_code": view.reason_code,
+                    },
+                }
+            )
             input_tokens += response.usage.input_tokens
             output_tokens += response.usage.output_tokens
         return ReinspectionResult(
@@ -86,3 +114,12 @@ class TargetedReinspection:
             usage=TokenUsage(input_tokens=input_tokens, output_tokens=output_tokens),
             api_calls=len(targets),
         )
+
+
+def _first_bbox(
+    regions: tuple[tuple[float, float, float, float], ...],
+) -> BBox | None:
+    if not regions:
+        return None
+    values = regions[0]
+    return tuple(round(value) for value in values)  # type: ignore[return-value]

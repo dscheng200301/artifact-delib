@@ -14,6 +14,8 @@ Existing `histo-delib`; no environment was created. The editable package install
 
 ## Completed
 
+- Isolated completion branch adds typed modality evidence and prompt provenance, relation-probe false-trigger fix, validated API routing with explicit fallback, deterministic image-view generation, stateful bounded cross-examination, baseline protocol metadata, run fingerprints, sample-ID-safe metrics, image/data quality checks, group-aware statistical helpers, thread-safe budget reservation, retry-attempt audit records, and pricing provenance fields.
+
 - Environment audit and engineering design/plan.
 - Existing `histo-delib` environment is now the only documented runtime; no environment creation commands remain.
 - API-only project metadata, typed schemas/settings, synthetic fixture builder, manifest import, split and leakage checks.
@@ -38,7 +40,7 @@ Existing `histo-delib`; no environment was created. The editable package install
 
 ## Tests
 
-- 79 passed; Ruff, mypy and pip check passed in `histo-delib`.
+- 101 passed; Ruff, mypy and pip check passed in `histo-delib` on the isolated completion branch.
 
 ## Mock Smoke Test
 

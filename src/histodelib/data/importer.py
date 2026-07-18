@@ -40,7 +40,18 @@ def import_manifest(manifest_path: Path, image_root: Path) -> list[Sample]:
                     source=row.get("source") or None,
                     license=row.get("license") or None,
                     domain=row.get("domain") or None,
-                    conflict_type=row.get("conflict_type") or None,
-                )
+                conflict_type=row.get("conflict_type") or None,
+                data_version=row.get("data_version") or None,
+                annotation_version=row.get("annotation_version") or None,
+                annotator_ids=tuple(
+                    item.strip()
+                    for item in (row.get("annotator_ids") or "").split(";")
+                    if item.strip()
+                ),
+                adjudication_status=row.get("adjudication_status") or None,
+                caption_source=row.get("caption_source") or None,
+                label_rationale=row.get("label_rationale") or None,
+                image_sha256=row.get("image_sha256") or None,
+            )
             )
     return samples

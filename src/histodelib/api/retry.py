@@ -3,14 +3,15 @@
 from __future__ import annotations
 
 from collections.abc import Callable
-from typing import TypeVar
 
 import httpx
 
-T = TypeVar("T")
 
-
-def retry_call(operation: Callable[[], T], max_retries: int) -> T:  # noqa: UP047
+def retry_call[T](
+    operation: Callable[[], T],
+    max_retries: int,
+    on_error: Callable[[Exception, int], None] | None = None,
+) -> T:
     """Retry timeouts and 429/5xx responses up to ``max_retries`` attempts."""
 
     attempts = max(1, max_retries)
@@ -18,6 +19,8 @@ def retry_call(operation: Callable[[], T], max_retries: int) -> T:  # noqa: UP04
         try:
             return operation()
         except Exception as exc:
+            if on_error is not None:
+                on_error(exc, attempt + 1)
             retryable = isinstance(exc, (TimeoutError, httpx.TimeoutException))
             if isinstance(exc, httpx.HTTPStatusError):
                 retryable = exc.response.status_code == 429 or exc.response.status_code >= 500
