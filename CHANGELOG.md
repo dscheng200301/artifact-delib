@@ -3,6 +3,7 @@
 ## 0.1.0 - 2026-07-17
 
 - Added `scripts/run_qwen_smoke.sh` for an explicit, guarded Qwen remote synthetic smoke run; it validates `.env` and the paid-call gate without printing credentials.
+- Added the equivalent native PowerShell entrypoint `scripts/run_qwen_smoke.ps1` for Windows environments without Bash/WSL.
 
 - Added environment audit, approved engineering design, and implementation plan.
 - Added API-only project metadata, typed schemas/settings, synthetic data validation, safe mock API infrastructure, disagreement routing, deferred judging, metrics, and CLI fixture smoke path.
