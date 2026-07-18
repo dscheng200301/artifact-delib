@@ -28,7 +28,7 @@ Existing `histo-delib`; no environment was created. The editable package install
 
 ## In Progress
 
-- Formal dataset selection, real API smoke tests and formal experiments remain intentionally deferred.
+- Formal dataset selection and formal experiments remain intentionally deferred; one real API synthetic smoke has now been executed.
 
 ## Blocked
 
@@ -44,11 +44,11 @@ Existing `histo-delib`; no environment was created. The editable package install
 
 ## Real API Smoke Test
 
-- NOT_RUN; paid calls are disabled.
+- COMPLETED transport smoke on `direct_vlm`: 12/12 DashScope-compatible calls returned, 0 transport errors, 10,224 tokens, estimated 0.0178848 CNY, cache misses only. All 12 predictions were `INSUFFICIENT_EVIDENCE` because the provider returned prose instead of parseable JSON; this is not a research result.
 
 ## Current API Budget
 
-- No API calls performed.
+- Last smoke budget accounting: 12 requests and 10,224 tokens; formal data remains `NOT_SELECTED`.
 
 ## Dataset Status
 
@@ -56,7 +56,7 @@ Existing `histo-delib`; no environment was created. The editable package install
 
 ## Last Successful Command
 
-- `PYTHONPATH=src conda run -n histo-delib python -m histodelib.cli run --method histodelib_rule --config fixture` (mock only)
+- `powershell -ExecutionPolicy Bypass -File .\\scripts\\run_qwen_smoke.ps1` (transport succeeded; structured-output parsing issue remains)
 
 ## Last Failed Command
 
@@ -68,4 +68,4 @@ Existing `histo-delib`; no environment was created. The editable package install
 
 ## Next Executable Step
 
-- Before any formal result claim: obtain data authorization, freeze prompts/models/API settings, run all baselines and ablations, and generate numbers only from structured artifacts.
+- Fix and re-test structured JSON output enforcement for Qwen, then obtain data authorization, freeze prompts/models/API settings, run all baselines and ablations, and generate numbers only from structured artifacts.
