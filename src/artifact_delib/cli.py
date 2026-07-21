@@ -1,8 +1,11 @@
 """CLI entry point for ArtifactDelib experiments.
 
 Usage:
-    artifact-delib run configs/experiments/pilot.yaml
-    python -m artifact_delib.cli run configs/experiments/pilot.yaml --help
+    artifact-delib run configs/experiments/pilot_smoke.yaml
+    artifact-delib run configs/experiments/pilot_smoke.yaml --dry-run
+    artifact-delib run configs/experiments/pilot.yaml --allow-remote
+    artifact-delib list
+    artifact-delib help
 """
 
 from __future__ import annotations
@@ -81,6 +84,8 @@ def _list_baselines() -> None:
             (CAT_LEGACY, "Legacy / Internal"),
         ]:
             baselines = list_baselines(cat_name)
+            if not baselines:
+                continue
             print(f"\n  {cat_label}:")
             for name, meta in sorted(baselines.items()):
                 desc = meta.get("description", "")
@@ -104,47 +109,73 @@ def _run_experiment(
 ) -> None:
     """Run an experiment from a YAML config file.
 
-    This is a STUB implementation for dry-run validation.
-    Full experiment execution requires explicit API authorization.
+    Args:
+        config_path: Path to the YAML configuration file.
+        dry_run: If True, validate config and environment without executing.
+        allow_remote: If True, allow real API calls.
     """
     config_file = Path(config_path)
     if not config_file.exists():
         print(f"Error: config file not found: {config_file}", file=sys.stderr)
         sys.exit(1)
 
-    try:
-        import yaml  # type: ignore[import-untyped]
-    except ImportError:
-        print("Warning: PyYAML not installed, reading config manually")
-        print()
-
-    config_text = config_file.read_text(encoding="utf-8")
-    print(f"\nArtifactDelib — Experiment Configuration")
-    print("=" * 50)
-    print(f"  Config: {config_file}")
-    print(f"  Dry-run: {dry_run}")
-    print(f"  Allow remote: {allow_remote}")
-
+    # ── Dry-run mode: validate thoroughly without executing ──
     if dry_run:
-        print("\n  DRY RUN — no API calls will be made.")
-        print("  Config validated successfully.")
+        from artifact_delib.experiment.runner import dry_run_experiment
+
+        dry_run_experiment(config_path)
         print()
         print("  To run with real API calls:")
         print(f"    artifact-delib run {config_path} --allow-remote")
         print()
         return
 
-    if not allow_remote:
-        print("\n  ERROR: Remote calls not allowed.", file=sys.stderr)
-        print("  Pass --allow-remote to enable API calls.", file=sys.stderr)
-        print()
-        print("  WARNING: This will incur API costs.", file=sys.stderr)
+    # ── Load and validate config ──
+    from artifact_delib.experiment.config import ExperimentConfig
+
+    try:
+        config = ExperimentConfig.from_yaml(config_file)
+    except Exception as e:
+        print(f"Error: config validation failed: {e}", file=sys.stderr)
         sys.exit(1)
 
-    # Full experiment execution — requires explicit authorization
-    print("\n  Full experiment execution not yet implemented.")
-    print("  Use --dry-run for config validation.")
+    # ── Check remote call authorization ──
+    effective_remote = allow_remote or config.execution.allow_remote_calls
+
+    if not effective_remote:
+        print("\n" + "=" * 56)
+        print("  Remote calls not allowed.")
+        print("=" * 56)
+        print()
+        print("  This experiment requires API calls but --allow-remote was not set")
+        print("  and config.execution.allow_remote_calls is false.")
+        print()
+        print("  To proceed:")
+        print(f"    artifact-delib run {config_path} --allow-remote")
+        print()
+        print("  WARNING: This will incur API costs.")
+        print()
+        sys.exit(1)
+
+    # Confirm
+    print("\n" + "=" * 56)
+    print(f"  Running experiment: {config.experiment.name}")
+    print(f"  Methods: {', '.join(config.methods)}")
+    print(f"  Model: {config.model.name}")
+    print(f"  Max samples: {config.dataset.max_samples or 'all'}")
+    print("=" * 56)
     print()
+    print("  WARNING: This will make real API calls and incur costs.")
+    print("  Press Ctrl+C within 5 seconds to abort...")
+    print()
+
+    import time
+    time.sleep(5)
+
+    # ── Run ──
+    from artifact_delib.experiment.runner import run_experiment
+
+    run_experiment(config, allow_remote=effective_remote)
 
 
 if __name__ == "__main__":
