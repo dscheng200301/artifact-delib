@@ -71,8 +71,9 @@ class RunAccounting:
         """Record one logical model call.
 
         Latency is auto-detected from usage.total_latency_ms if not explicitly
-        provided. Cost is estimated at $0.002/1K input + $0.008/1K output
-        if not explicitly provided.
+        provided. Cost is estimated if not explicitly provided.
+        Pricing should be looked up via PricingRegistry for accuracy;
+        the hard-coded fallback here is a rough estimate only.
         """
         self.logical_call_count += 1
         if cache_hit:
@@ -106,7 +107,7 @@ class RunAccounting:
             "agent": agent_name,
             "input_tokens": usage.input_tokens,
             "output_tokens": usage.output_tokens,
-            "latency_ms": latency_ms,
+            "latency_ms": actual_latency,
             "cost_usd": cost_usd,
             "cache_hit": cache_hit,
         })
@@ -115,6 +116,7 @@ class RunAccounting:
         return TokenUsage(
             input_tokens=self.input_tokens,
             output_tokens=self.output_tokens,
+            total_latency_ms=self.total_latency_ms,
         )
 
     def merge(self, other: RunAccounting) -> None:
