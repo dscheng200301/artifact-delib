@@ -261,15 +261,15 @@ def test_batch_runner_resume() -> None:
         )
         r1 = runner1.run(samples[:2])
 
-        # Second run (should skip completed)
+        # Second run (should skip completed, merge all)
         runner2 = BatchRunner(
             method=pipeline, output_root=t / "output",
             experiment_id="test-resume-001", method_name="test",
         )
         r2 = runner2.run(samples[:4])
 
-        # All 4 should complete (first 2 from cache)
-        assert len(r2) == 2  # Only uncompleted ones returned
+        # All 4 should be returned (merged from existing + new)
+        assert len(r2) == 4  # All samples after merge
 
 
 def test_batch_runner_with_baselines() -> None:

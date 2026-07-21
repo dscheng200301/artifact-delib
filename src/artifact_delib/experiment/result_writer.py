@@ -118,23 +118,21 @@ def write_api_calls_log(
     results: list[PipelineResult],
     method_name: str,
 ) -> None:
-    """Write api_calls.jsonl with per-call accounting details."""
+    """Write api_calls.jsonl with per-agent call accounting details."""
     path = output_dir / "api_calls.jsonl"
     with path.open("w", encoding="utf-8") as f:
         for r in results:
-            # Extract accounting from call_records if available
-            call_records = getattr(r, "_call_records", None) or []
-            if call_records:
-                for rec in call_records:
+            if r.call_records:
+                for rec in r.call_records:
                     record = {
                         "sample_id": r.sample_id,
                         "method": method_name,
-                        "agent": rec.get("agent", "unknown"),
-                        "input_tokens": rec.get("input_tokens", 0),
-                        "output_tokens": rec.get("output_tokens", 0),
-                        "latency_ms": rec.get("latency_ms", None),
-                        "cost_usd": rec.get("cost_usd", 0.0),
-                        "cache_hit": rec.get("cache_hit", False),
+                        "agent": rec.agent,
+                        "input_tokens": rec.input_tokens,
+                        "output_tokens": rec.output_tokens,
+                        "latency_ms": rec.latency_ms,
+                        "cost_usd": rec.cost_usd,
+                        "cache_hit": rec.cache_hit,
                     }
                     f.write(json.dumps(record, ensure_ascii=False) + "\n")
             else:

@@ -99,6 +99,13 @@ class EvaluationResult:
     p95_latency_ms: float | None = None
     average_latency_ms: float | None = None
 
+    # Label coverage — what fraction of samples have valid gold labels
+    category_label_coverage: float | None = None
+    type_label_coverage: float | None = None
+    period_label_coverage: float | None = None
+    material_label_coverage: float | None = None
+    joint_label_coverage: float | None = None
+
     # ── Backward-compatible aliases (legacy field names) ──
     # These map old names → Top-1 accuracy so existing code keeps working.
 
@@ -125,16 +132,22 @@ class EvaluationResult:
 
 @dataclass
 class SampleEvaluation:
-    """Evaluation result for a single sample."""
+    """Evaluation result for a single sample.
+
+    Correctness fields are bool | None:
+    - True: prediction matches gold
+    - False: prediction does not match gold
+    - None: gold label is missing (no valid comparison)
+    """
 
     sample_id: str
 
-    # Top-1
-    category_correct: bool = False
-    type_correct: bool = False
-    period_correct: bool = False
-    material_correct: bool = False
-    joint_correct: bool = False
+    # Top-1 — None means gold label not available
+    category_correct: bool | None = None
+    type_correct: bool | None = None
+    period_correct: bool | None = None
+    material_correct: bool | None = None
+    joint_correct: bool | None = None
 
     # Top-K (whether gold is in any of top-K candidate texts)
     type_in_top3: bool = False
@@ -182,10 +195,17 @@ class ArtifactMetrics:
     ) -> SampleEvaluation:
         """Evaluate one sample against its gold labels.
 
+        Missing gold labels (None) are properly handled:
+        - If gold is None, the corresponding accuracy comparison is skipped
+          (not counted as correct or incorrect)
+        - This prevents missing labels from being wrongly counted as prediction errors
+        - Use label_coverage metrics to report how many samples have valid labels
+
         Args:
             sample_id: Unique sample identifier.
             final_text: The final NL identification (Top-1 prediction).
             gold_category / gold_type / gold_period / gold_material: Ground-truth labels.
+                None means the label is not available (not an error).
             initial_text: Optional initial prediction for correction/harm tracking.
             candidate_texts: Optional list of top-K candidate NL texts (sorted by
                 confidence, highest first). Used to compute Top-K accuracy.
@@ -193,27 +213,40 @@ class ArtifactMetrics:
         pred = self.parser.parse(final_text)
 
         # ── Top-1 accuracy ──
-        cat_correct = (
+        # When gold is None, the comparison is undefined — set to None
+        # to indicate "no valid comparison" rather than "incorrect".
+        cat_correct: bool | None = (
             pred.category == gold_category
-            if pred.category and gold_category
-            else False
+            if pred.category is not None and gold_category is not None
+            else None
         )
-        type_correct = (
+        type_correct: bool | None = (
             pred.fine_grained_type == gold_type
-            if pred.fine_grained_type and gold_type
-            else False
+            if pred.fine_grained_type is not None and gold_type is not None
+            else None
         )
-        period_correct = (
+        period_correct: bool | None = (
             pred.period == gold_period
-            if pred.period and gold_period
-            else False
+            if pred.period is not None and gold_period is not None
+            else None
         )
-        material_correct = (
+        material_correct: bool | None = (
             pred.material == gold_material
-            if pred.material and gold_material
-            else False
+            if pred.material is not None and gold_material is not None
+            else None
         )
-        joint = type_correct and period_correct
+        # Joint: only defined when both type AND period have valid gold
+        joint: bool | None = (
+            True if (type_correct is True and period_correct is True)
+            else False if (type_correct is not None and period_correct is not None
+                          and type_correct is False or period_correct is False)
+            else None
+        )
+        # Simpler: joint is None if either is None
+        if type_correct is None or period_correct is None:
+            joint = None
+        else:
+            joint = type_correct and period_correct
 
         # ── Top-K accuracy (from candidate texts) ──
         type_in_top3, type_in_top5 = False, False
@@ -236,15 +269,16 @@ class ArtifactMetrics:
         # ── Correction / harm ──
         corrected = False
         harmed = False
-        if initial_text is not None:
+        if initial_text is not None and gold_type is not None:
             initial_pred = self.parser.parse(initial_text)
             initial_type_ok = (
                 initial_pred.fine_grained_type == gold_type
-                if initial_pred.fine_grained_type and gold_type
-                else False
+                if initial_pred.fine_grained_type is not None and gold_type is not None
+                else None
             )
-            corrected = not initial_type_ok and type_correct
-            harmed = initial_type_ok and not type_correct
+            if initial_type_ok is not None and type_correct is not None:
+                corrected = not initial_type_ok and type_correct
+                harmed = initial_type_ok and not type_correct
 
         return SampleEvaluation(
             sample_id=sample_id,
@@ -317,27 +351,72 @@ class ArtifactMetrics:
         if n == 0:
             return EvaluationResult(n_samples=0)
 
-        # ── Top-1 accuracy ──
-        top1_cat = sum(e.category_correct for e in evaluations) / n
-        top1_type = sum(e.type_correct for e in evaluations) / n
-        top1_period = sum(e.period_correct for e in evaluations) / n
-        top1_material = sum(e.material_correct for e in evaluations) / n
-        top1_joint = sum(e.joint_correct for e in evaluations) / n
+        # ── Top-1 accuracy with valid-only denominators ──
+        # Each metric only counts samples where the gold label is available.
+        # Missing gold labels (None) are excluded from the denominator.
+        def _valid_accuracy(
+            evaluations: list[SampleEvaluation],
+            attr: str,
+        ) -> tuple[float | None, int, int]:
+            """Compute accuracy using only samples with valid gold labels.
 
-        # ── Top-K accuracy ──
-        top3_type = sum(e.type_in_top3 for e in evaluations) / n
-        top5_type = sum(e.type_in_top5 for e in evaluations) / n
-        top3_period = sum(e.period_in_top3 for e in evaluations) / n
-        top5_period = sum(e.period_in_top5 for e in evaluations) / n
-        top3_joint = sum(e.joint_in_top3 for e in evaluations) / n
-        top5_joint = sum(e.joint_in_top5 for e in evaluations) / n
+            Returns:
+                (accuracy, valid_count, total_count)
+            """
+            valid = [e for e in evaluations if getattr(e, attr) is not None]
+            if not valid:
+                return None, 0, len(evaluations)
+            correct = sum(1 for e in valid if getattr(e, attr) is True)
+            return correct / len(valid), len(valid), len(evaluations)
+
+        top1_cat, n_cat_valid, n_cat_total = _valid_accuracy(evaluations, "category_correct")
+        top1_type, n_type_valid, n_type_total = _valid_accuracy(evaluations, "type_correct")
+        top1_period, n_period_valid, n_period_total = _valid_accuracy(evaluations, "period_correct")
+        top1_material, n_material_valid, n_material_total = _valid_accuracy(evaluations, "material_correct")
+
+        # Joint: only when both type AND period are valid
+        joint_valid = [
+            e for e in evaluations
+            if e.type_correct is not None and e.period_correct is not None
+        ]
+        if joint_valid:
+            joint_correct = sum(
+                1 for e in joint_valid
+                if e.type_correct is True and e.period_correct is True
+            )
+            top1_joint = joint_correct / len(joint_valid)
+            n_joint_valid = len(joint_valid)
+        else:
+            top1_joint = None
+            n_joint_valid = 0
+
+        # ── Top-K accuracy (valid-only denominators) ──
+        def _valid_topk(
+            evaluations: list[SampleEvaluation],
+            attr: str,
+            gold_attr: str,
+        ) -> float | None:
+            valid = [e for e in evaluations if getattr(e, gold_attr) is not None]
+            if not valid:
+                return None
+            return sum(getattr(e, attr) for e in valid) / len(valid)
+
+        top3_type = _valid_topk(evaluations, "type_in_top3", "gold_type")
+        top5_type = _valid_topk(evaluations, "type_in_top5", "gold_type")
+        top3_period = _valid_topk(evaluations, "period_in_top3", "gold_period")
+        top5_period = _valid_topk(evaluations, "period_in_top5", "gold_period")
+        top3_joint = _valid_topk(evaluations, "joint_in_top3", "gold_type")
+        top5_joint = _valid_topk(evaluations, "joint_in_top5", "gold_type")
 
         # ── Correction / harm ──
-        total_correctable = sum(1 for e in evaluations if e.corrected or e.harmed)
-        corrections = sum(1 for e in evaluations if e.corrected)
-        harms = sum(1 for e in evaluations if e.harmed)
+        # Only count corrections/harms for samples with valid gold labels
+        valid_type_evals = [e for e in evaluations if e.gold_type is not None]
+        total_correctable = sum(1 for e in valid_type_evals if e.corrected or e.harmed)
+        corrections = sum(1 for e in valid_type_evals if e.corrected)
+        harms = sum(1 for e in valid_type_evals if e.harmed)
+        n_valid = len(valid_type_evals)
         correction_rate = corrections / total_correctable if total_correctable else None
-        harm_rate = harms / (n - total_correctable + harms) if n - total_correctable + harms else None
+        harm_rate = harms / (n_valid - total_correctable + harms) if n_valid - total_correctable + harms else None
 
         # ── Per-class Precision / Recall / F1 ──
         per_cat = self._compute_per_class_metrics(
@@ -426,6 +505,13 @@ class ArtifactMetrics:
         med_tokens = float(median(token_counts)) if token_counts else None
         avg_api = sum(api_calls) / len(api_calls) if api_calls else None
 
+        # ── Label coverage ──
+        cat_coverage = n_cat_valid / n if n else None
+        type_coverage = n_type_valid / n if n else None
+        period_coverage = n_period_valid / n if n else None
+        material_coverage = n_material_valid / n if n else None
+        joint_coverage = n_joint_valid / n if n else None
+
         return EvaluationResult(
             n_samples=n,
             top1_category_accuracy=top1_cat,
@@ -470,6 +556,11 @@ class ArtifactMetrics:
             p50_latency_ms=p50_lat_ms,
             p95_latency_ms=p95_lat_ms,
             average_latency_ms=avg_lat_ms,
+            category_label_coverage=cat_coverage,
+            type_label_coverage=type_coverage,
+            period_label_coverage=period_coverage,
+            material_label_coverage=material_coverage,
+            joint_label_coverage=joint_coverage,
         )
 
     @staticmethod

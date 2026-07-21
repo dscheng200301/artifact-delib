@@ -167,6 +167,20 @@ class RouteDecision:
 
 
 @dataclass(frozen=True)
+class CallRecord:
+    """A single API call record with per-agent accounting."""
+
+    agent: str
+    input_tokens: int = 0
+    output_tokens: int = 0
+    latency_ms: float = 0.0
+    cost_usd: float | None = None
+    cache_hit: bool | None = None
+    provider: str | None = None
+    model: str | None = None
+
+
+@dataclass(frozen=True)
 class PipelineResult:
     """Complete pipeline result with full provenance."""
 
@@ -185,3 +199,4 @@ class PipelineResult:
     total_usage: TokenUsage = field(default_factory=TokenUsage)
     total_api_calls: int = 0
     status: str = "COMPLETED"
+    call_records: tuple[CallRecord, ...] = ()

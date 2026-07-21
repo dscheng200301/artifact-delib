@@ -13,7 +13,7 @@ dist/
 tmp/
 
 # Data files (download separately from Met Museum Open Access)
-data/
+/data/
 
 # Outputs
 outputs/

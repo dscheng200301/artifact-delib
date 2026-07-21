@@ -308,13 +308,17 @@ def test_compute_top5_accuracy(metrics: ArtifactMetrics) -> None:
     """Aggregate Top-1 / Top-3 / Top-5 accuracy from mixed evaluations."""
     evals = [
         # Sample 1: top1 correct + in top3/5
-        SampleEvaluation("s1", type_correct=True, type_in_top3=True, type_in_top5=True),
+        SampleEvaluation("s1", type_correct=True, type_in_top3=True, type_in_top5=True,
+                         gold_type="梅瓶"),
         # Sample 2: top1 wrong but in top3
-        SampleEvaluation("s2", type_correct=False, type_in_top3=True, type_in_top5=True),
+        SampleEvaluation("s2", type_correct=False, type_in_top3=True, type_in_top5=True,
+                         gold_type="梅瓶"),
         # Sample 3: only in top5 (missed top3)
-        SampleEvaluation("s3", type_correct=False, type_in_top3=False, type_in_top5=True),
+        SampleEvaluation("s3", type_correct=False, type_in_top3=False, type_in_top5=True,
+                         gold_type="梅瓶"),
         # Sample 4: missed everything
-        SampleEvaluation("s4", type_correct=False, type_in_top3=False, type_in_top5=False),
+        SampleEvaluation("s4", type_correct=False, type_in_top3=False, type_in_top5=False,
+                         gold_type="梅瓶"),
     ]
     result = metrics.compute_metrics(evals)
     assert result.top1_type_accuracy == 0.25    # 1/4

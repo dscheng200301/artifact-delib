@@ -14,6 +14,7 @@ from pathlib import Path
 
 from artifact_delib.api.schemas import TokenUsage
 from artifact_delib.schemas import (
+    CallRecord,
     CandidateSet,
     DeliberationResult,
     DisagreementAnalysis,
@@ -186,7 +187,20 @@ class PipelineState:
     final_identification: FinalIdentification | None = None
 
     def to_pipeline_result(self) -> PipelineResult:
-        """Convert state to a PipelineResult."""
+        """Convert state to a PipelineResult with full call provenance."""
+        # Build CallRecord list from accounting call_records
+        call_records = tuple(
+            CallRecord(
+                agent=rec.get("agent", "unknown"),
+                input_tokens=rec.get("input_tokens", 0),
+                output_tokens=rec.get("output_tokens", 0),
+                latency_ms=rec.get("latency_ms", 0.0),
+                cost_usd=rec.get("cost_usd"),
+                cache_hit=rec.get("cache_hit"),
+            )
+            for rec in self.accounting.call_records
+        )
+
         return PipelineResult(
             sample_id=self.sample_id,
             final_identification=self.final_identification
@@ -216,4 +230,5 @@ class PipelineState:
             total_usage=self.accounting.to_token_usage(),
             total_api_calls=self.accounting.logical_call_count,
             status="COMPLETED",
+            call_records=call_records,
         )

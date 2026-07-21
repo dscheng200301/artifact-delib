@@ -42,35 +42,70 @@ def _create_model_client(
 
     Args:
         model_name: Model name string.
-        allow_remote: If True, use a real API client; otherwise use mock.
+        allow_remote: If True, use a real DashScope API client.
 
     Returns:
         A ModelClient instance.
+
+    Raises:
+        RuntimeError: If allow_remote=True but client creation fails
+            (fail-closed: never fallback to mock).
     """
     if allow_remote:
+        logger.info("Creating real DashScope API client (fail-closed mode)")
+        try:
+            from artifact_delib.api.dashscope_client import DashScopeModelClient
+
+            raw_client = DashScopeModelClient(model=model_name)
+        except Exception as e:
+            logger.error(
+                "Failed to create DashScope client: %s. "
+                "FAIL-CLOSED — aborting. Set DASHSCOPE_API_KEY environment variable.",
+                e,
+            )
+            raise RuntimeError(
+                f"Cannot create DashScope client: {e}. "
+                "Real mode never falls back to mock. "
+                "Set DASHSCOPE_API_KEY and ensure network access."
+            ) from e
+
+        # Wrap in guarded + audited layers
         try:
             from artifact_delib.api.guarded import GuardedModelClient
             from artifact_delib.api.audited import AuditedModelClient
+            from artifact_delib.api.cache import ResponseCache
+            from artifact_delib.api.budget import BudgetManager
+            from artifact_delib.api.call_log import CallLogStore
 
-            # Try to find a real API client implementation
-            logger.info("Remote calls enabled — creating real API client")
-            from artifact_delib.models.mock_artifact import ArtifactMockClient
-
-            logger.warning(
-                "No real API client implementation available (API key not configured). "
-                "Falling back to mock client. Set DASHSCOPE_API_KEY or other env vars."
+            cache = ResponseCache()
+            budget = BudgetManager()
+            call_log = CallLogStore()
+            guarded = GuardedModelClient(
+                client=raw_client,
+                cache=cache,
+                budget=budget,
+                call_log=call_log,
+                max_retries=3,
+                max_concurrency=1,
             )
-            return ArtifactMockClient()
+            return AuditedModelClient(
+                client=guarded,
+                call_log=call_log,
+            )
         except Exception as e:
-            logger.warning(
-                f"Failed to create remote client: {e}. Falling back to mock."
+            logger.error(
+                "Failed to wrap DashScope client with safeguards: %s. "
+                "FAIL-CLOSED — aborting.",
+                e,
             )
-            from artifact_delib.models.mock_artifact import ArtifactMockClient
-
-            return ArtifactMockClient()
+            raise RuntimeError(
+                f"Cannot wrap DashScope client: {e}. "
+                "Real mode never falls back to mock."
+            ) from e
     else:
         from artifact_delib.models.mock_artifact import ArtifactMockClient
 
+        logger.info("Creating mock client (allow_remote=False)")
         return ArtifactMockClient()
 
 
@@ -183,6 +218,15 @@ def run_experiment(
 ) -> None:
     """Run a full experiment: preflight, methods, evaluation, output.
 
+    Flow:
+        1. Load & validate config
+        2. Load FULL manifest
+        3. Load split assignments → inject into ALL samples
+        4. Leakage preflight on FULL dataset (train + validation + test)
+        5. Select experimental split (e.g. test only)
+        6. Apply max_samples
+        7. For each method: Instantiate → BatchRunner → Evaluate → Save
+
     Args:
         config: Validated experiment configuration.
         allow_remote: If True, allow real API calls.
@@ -196,21 +240,40 @@ def run_experiment(
         print(f"  {config.experiment.description}")
     print(f"{'=' * 56}")
 
-    # ── Preflight ──
-    preflight_report, samples = run_preflight(config, verbose=True)
+    # ── 1. Config preflight ──
+    preflight_report, _ = run_preflight(config, verbose=True)
     if not preflight_report.passed:
         print("\n  Preflight FAILED. Aborting experiment.")
         raise SystemExit(1)
 
-    if samples is None:
-        print("\n  No samples loaded. Aborting experiment.")
-        raise SystemExit(1)
+    # ── 2. Load FULL manifest ──
+    from artifact_delib.data.importer import ArtifactDatasetImporter
 
-    # ── Leakage preflight ──
-    leakage_report = run_leakage_preflight(samples, config.leakage_detection)
+    manifest_path = Path(config.dataset.manifest)
+    image_root = Path(config.dataset.image_root)
+    importer = ArtifactDatasetImporter(image_root=image_root)
+    all_samples = importer.import_manifest(manifest_path)
+    print(f"\n  Loaded {len(all_samples)} samples from manifest")
+
+    # ── 3. Apply split assignments ──
+    if config.dataset.split_file:
+        split_path = Path(config.dataset.split_file)
+        if split_path.exists():
+            from artifact_delib.data.split_manifest import SplitManifest
+
+            split_manifest = SplitManifest.load(config.dataset.split_file)
+            all_samples = split_manifest.assign(all_samples)
+            print(f"  Split assignments applied: "
+                  f"{sum(1 for s in all_samples if s.split == 'train')} train, "
+                  f"{sum(1 for s in all_samples if s.split == 'validation')} val, "
+                  f"{sum(1 for s in all_samples if s.split == 'test')} test, "
+                  f"{sum(1 for s in all_samples if s.split is None)} unassigned")
+
+    # ── 4. Leakage preflight on FULL dataset ──
+    leakage_report = run_leakage_preflight(all_samples, config.leakage_detection)
     leakage_report.print()
     if not leakage_report.passed:
-        print("\n  Leakage preflight FAILED. Aborting experiment.")
+        print("\n  Leakage preflight FAILED on full dataset. Aborting experiment.")
         print("  Fix leakage issues or disable failing checks.")
         raise SystemExit(1)
 
@@ -221,17 +284,34 @@ def run_experiment(
         )
     ) or None
 
-    # ── Create model client ──
+    # ── 5. Select experimental split ──
+    target_split = "test"
+    experiment_samples = [s for s in all_samples if s.split == target_split]
+    if not experiment_samples:
+        print(f"\n  No samples with split='{target_split}'. Using all samples.")
+        experiment_samples = all_samples
+
+    # ── 6. Apply max_samples ──
+    if config.dataset.max_samples and len(experiment_samples) > config.dataset.max_samples:
+        import random
+        rng = random.Random(config.dataset.seed)
+        rng.shuffle(experiment_samples)
+        experiment_samples = experiment_samples[: config.dataset.max_samples]
+        print(f"\n  Limited to {len(experiment_samples)} samples (max_samples={config.dataset.max_samples})")
+    else:
+        print(f"\n  Using {len(experiment_samples)} samples from split='{target_split}'")
+
+    # ── 7. Create model client ──
     client = _create_model_client(config.model.name, allow_remote)
 
-    # ── Run each method ──
+    # ── 8. Run each method ──
     all_results: list[dict[str, Any]] = []
     for method_name in config.methods:
         result = _run_method(
             method_name=method_name,
             client=client,
             model_name=config.model.name,
-            samples=samples,
+            samples=experiment_samples,
             config=config,
             allow_remote=allow_remote,
         )
