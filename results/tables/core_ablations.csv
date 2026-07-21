@@ -1,0 +1,10 @@
+Variant,Category Acc.,Type Acc.,Period Acc.,Joint Acc.,Macro-F1,API Calls,Tokens,Latency (s),Delta vs Full
+Full ArtifactDelib,,,,,,,,,
+w/o Expert Specialization (A1),,,,,,,,,
+w/o Disagreement Analysis (A2),,,,,,,,,
+w/o Dynamic Routing (A3),,,,,,,,,
+Random Recheck (A4),,,,,,,,,
+w/o Controlled Deliberation (A5),,,,,,,,,
+Free Debate (A6),,,,,,,,,
+w/o Critic (A7),,,,,,,,,
+Early Judge (A8),,,,,,,,,

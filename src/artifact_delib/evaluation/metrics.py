@@ -1,9 +1,9 @@
 """Metrics for ArtifactDelib evaluation — computed only from parsed predictions vs gold labels.
 
 Metrics computed:
-- Top-1 / Top-3 / Top-5 Accuracy (category, type, period, joint)
+- Top-1 / Top-3 / Top-5 Accuracy (category, type, period, material, joint)
   Top-1 = final prediction; Top-K = gold in top-K candidate texts.
-- Per-class Precision / Recall / F1 (category, type, period)
+- Per-class Precision / Recall / F1 (category, type, period, material)
 - Macro-F1 (averaged across classes)
 - Correction Rate (initial wrong → final correct after interaction)
 - Harm Rate (initial correct → final wrong after interaction)
@@ -43,6 +43,7 @@ class EvaluationResult:
     top1_category_accuracy: float | None = None
     top1_type_accuracy: float | None = None
     top1_period_accuracy: float | None = None
+    top1_material_accuracy: float | None = None
     top1_joint_accuracy: float | None = None
 
     # Top-K accuracy (K=3,5) — whether gold is in any of top-K candidate texts
@@ -57,6 +58,7 @@ class EvaluationResult:
     macro_f1_type: float | None = None
     macro_f1_period: float | None = None
     macro_f1_category: float | None = None
+    macro_f1_material: float | None = None
     macro_precision_type: float | None = None
     macro_recall_type: float | None = None
     macro_precision_period: float | None = None
@@ -70,6 +72,7 @@ class EvaluationResult:
     per_type: dict[str, PerClassMetrics] | None = None
     per_period: dict[str, PerClassMetrics] | None = None
     per_category: dict[str, PerClassMetrics] | None = None
+    per_material: dict[str, PerClassMetrics] | None = None
 
     # Cost
     average_tokens: float | None = None
@@ -111,6 +114,7 @@ class SampleEvaluation:
     category_correct: bool = False
     type_correct: bool = False
     period_correct: bool = False
+    material_correct: bool = False
     joint_correct: bool = False
 
     # Top-K (whether gold is in any of top-K candidate texts)
@@ -125,9 +129,11 @@ class SampleEvaluation:
     predicted_category: str | None = None
     predicted_type: str | None = None
     predicted_period: str | None = None
+    predicted_material: str | None = None
     gold_category: str | None = None
     gold_type: str | None = None
     gold_period: str | None = None
+    gold_material: str | None = None
 
     # Interaction metrics
     corrected: bool = False
@@ -151,6 +157,7 @@ class ArtifactMetrics:
         gold_category: str | None,
         gold_type: str | None,
         gold_period: str | None,
+        gold_material: str | None = None,
         initial_text: str | None = None,
         candidate_texts: list[str] | None = None,
     ) -> SampleEvaluation:
@@ -159,7 +166,7 @@ class ArtifactMetrics:
         Args:
             sample_id: Unique sample identifier.
             final_text: The final NL identification (Top-1 prediction).
-            gold_category / gold_type / gold_period: Ground-truth labels.
+            gold_category / gold_type / gold_period / gold_material: Ground-truth labels.
             initial_text: Optional initial prediction for correction/harm tracking.
             candidate_texts: Optional list of top-K candidate NL texts (sorted by
                 confidence, highest first). Used to compute Top-K accuracy.
@@ -180,6 +187,11 @@ class ArtifactMetrics:
         period_correct = (
             pred.period == gold_period
             if pred.period and gold_period
+            else False
+        )
+        material_correct = (
+            pred.material == gold_material
+            if pred.material and gold_material
             else False
         )
         joint = type_correct and period_correct
@@ -220,6 +232,7 @@ class ArtifactMetrics:
             category_correct=cat_correct,
             type_correct=type_correct,
             period_correct=period_correct,
+            material_correct=material_correct,
             joint_correct=joint,
             type_in_top3=type_in_top3,
             type_in_top5=type_in_top5,
@@ -230,9 +243,11 @@ class ArtifactMetrics:
             predicted_category=pred.category,
             predicted_type=pred.fine_grained_type,
             predicted_period=pred.period,
+            predicted_material=pred.material,
             gold_category=gold_category,
             gold_type=gold_type,
             gold_period=gold_period,
+            gold_material=gold_material,
             corrected=corrected,
             harmed=harmed,
         )
@@ -275,6 +290,7 @@ class ArtifactMetrics:
         top1_cat = sum(e.category_correct for e in evaluations) / n
         top1_type = sum(e.type_correct for e in evaluations) / n
         top1_period = sum(e.period_correct for e in evaluations) / n
+        top1_material = sum(e.material_correct for e in evaluations) / n
         top1_joint = sum(e.joint_correct for e in evaluations) / n
 
         # ── Top-K accuracy ──
@@ -308,6 +324,11 @@ class ArtifactMetrics:
             pred_fn=lambda e: e.predicted_period,
             gold_fn=lambda e: e.gold_period,
         )
+        per_material = self._compute_per_class_metrics(
+            evaluations,
+            pred_fn=lambda e: e.predicted_material,
+            gold_fn=lambda e: e.gold_material,
+        )
 
         # ── Macro averages ──
         def _macro(values: dict[str, PerClassMetrics], attr: str) -> float | None:
@@ -318,6 +339,7 @@ class ArtifactMetrics:
         macro_f1_type = _macro(per_type, "f1")
         macro_f1_period = _macro(per_period, "f1")
         macro_f1_category = _macro(per_cat, "f1")
+        macro_f1_material = _macro(per_material, "f1")
         macro_p_type = _macro(per_type, "precision")
         macro_r_type = _macro(per_type, "recall")
         macro_p_period = _macro(per_period, "precision")
@@ -333,6 +355,7 @@ class ArtifactMetrics:
             top1_category_accuracy=top1_cat,
             top1_type_accuracy=top1_type,
             top1_period_accuracy=top1_period,
+            top1_material_accuracy=top1_material,
             top1_joint_accuracy=top1_joint,
             top3_type_accuracy=top3_type,
             top5_type_accuracy=top5_type,
@@ -343,6 +366,7 @@ class ArtifactMetrics:
             macro_f1_type=macro_f1_type,
             macro_f1_period=macro_f1_period,
             macro_f1_category=macro_f1_category,
+            macro_f1_material=macro_f1_material,
             macro_precision_type=macro_p_type,
             macro_recall_type=macro_r_type,
             macro_precision_period=macro_p_period,
@@ -352,6 +376,7 @@ class ArtifactMetrics:
             per_type=per_type or None,
             per_period=per_period or None,
             per_category=per_cat or None,
+            per_material=per_material or None,
             average_tokens=avg_tokens,
             median_tokens=med_tokens,
             total_api_calls=sum(api_calls) if api_calls else 0,

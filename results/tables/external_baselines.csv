@@ -1,0 +1,9 @@
+Method,Category Acc.,Type Acc.,Period Acc.,Material Acc.,Joint Acc.,Macro-F1,API Calls,Total Tokens,Latency (s),Cost (est.)
+clip_zero_shot,,,,,,,,,,
+dinov2_knn,,,,,,,,,,
+blip2_zero_shot,,,,,,,,,,
+direct_single_vlm,,,,,,,,,,
+self_consistency_vlm,,,,,,,,,,
+multi_agent_debate,,,,,,,,,,
+artifact_delib_rule,,,,,,,,,,
+artifact_delib_mlp,,,,,,,,,,

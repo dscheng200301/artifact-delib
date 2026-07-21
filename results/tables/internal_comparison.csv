@@ -1,0 +1,6 @@
+Method,Category Acc.,Type Acc.,Period Acc.,Material Acc.,Joint Acc.,Macro-F1,API Calls,Total Tokens,Latency (s),Cost (est.)
+FixedMultiExpert,,,,,,,,,,
+FixedFull,,,,,,,,,,
+ArtifactDelib-Rule,,,,,,,,,,
+ArtifactDelib-MLP,,,,,,,,,,
+OracleRouter,,,,,,,,,,
