@@ -252,6 +252,31 @@ def test_register_and_get() -> None:
     assert instance is not None
 
 
+def test_auto_registration_populates_all_categories() -> None:
+    """Auto-registration at import time should populate external and ours."""
+    external = list_baselines(CAT_EXTERNAL)
+    ours = list_baselines(CAT_OURS)
+
+    expected_external = {
+        "clip_zero_shot", "dinov2_knn", "blip2_zero_shot",
+        "direct_single_vlm", "self_consistency_vlm", "multi_agent_debate",
+    }
+    expected_ours = {"artifact_delib_rule", "artifact_delib_mlp"}
+
+    actual_external = set(external.keys())
+    actual_ours = set(ours.keys())
+
+    missing_external = expected_external - actual_external
+    extra_external = actual_external - expected_external
+    assert not missing_external, f"Missing external baselines: {missing_external}"
+    assert not extra_external, f"Unexpected external baselines: {extra_external}"
+
+    missing_ours = expected_ours - actual_ours
+    extra_ours = actual_ours - expected_ours
+    assert not missing_ours, f"Missing ours baselines: {missing_ours}"
+    assert not extra_ours, f"Unexpected ours baselines: {extra_ours}"
+
+
 # ═══════════════════════════════════════════════════════════════
 #  Backward compatibility tests
 # ═══════════════════════════════════════════════════════════════
@@ -364,6 +389,23 @@ def test_self_consistency_varying_n(sample, client) -> None:
         sc = SelfConsistencyBaseline(client, n_samples=n, seed=42)
         r = sc.run(sample.image_path)
         assert r.total_api_calls == n
+
+
+def test_self_consistency_stores_samples(sample, client) -> None:
+    """_samples should store all raw outputs and summarized_report should have JSON."""
+    import json
+
+    sc = SelfConsistencyBaseline(client, n_samples=5, seed=42)
+    result = sc.run(sample.image_path, sample.sample_id)
+    # _samples attribute should hold all 5 raw responses
+    assert len(sc._samples) == 5
+    assert all(isinstance(s, str) and len(s) > 0 for s in sc._samples)
+    # summarized_report.content should be valid JSON with sample details
+    summary = json.loads(result.summarized_report.content)
+    assert summary["n_samples"] == 5
+    assert len(summary["samples"]) == 5
+    assert "aggregation_method" in summary
+    assert "judge_called" in summary
 
 
 # ═══════════════════════════════════════════════════════════════
