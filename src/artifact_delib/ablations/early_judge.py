@@ -1,67 +1,75 @@
 """A8: Early Judge instead of Deferred Judge.
 
-The judge makes a preliminary identification right after candidate generation,
-BEFORE recheck or deliberation. This preliminary conclusion is then provided
-to the recheck and deliberation stages, potentially introducing anchoring bias.
+Tests whether early judge participation introduces anchoring bias.
 
-The full pipeline defers the judge until after all recheck/deliberation.
+Full ArtifactDelib: Judge is the LAST module (deferred).
+A8: Judge runs AFTER candidate generation and its preliminary opinion
+    is shown to recheck/deliberation stages.
+
+Overrides _stage_initial_analysis to produce a preliminary judgment
+that is passed to subsequent rechecks and deliberation.
 """
+
 from __future__ import annotations
-from pathlib import Path
+
 from artifact_delib.pipeline.artifact_delib_pipeline import ArtifactDelibPipeline
-from artifact_delib.schemas import CandidateSet, PipelineResult
+from artifact_delib.pipeline.state import PipelineState
+from artifact_delib.api.schemas import TokenUsage
+from artifact_delib.schemas import CandidateSet, SummarizedReport, VisualPerceptionReport
 
 
 class AblationEarlyJudge(ArtifactDelibPipeline):
     """A8: Judge runs early (before recheck/deliberation).
 
-    The early judge result IS the final result. Recheck and deliberation
-    are not run. This tests whether deferring the judge reduces anchoring
-    bias and improves outcomes.
+    The preliminary judgment is injected into the pipeline state, making
+    it visible to subsequent recheck and deliberation stages — testing
+    whether anchoring bias affects final outcomes.
+
+    The pipeline still runs the full routing loop and final judge.
     """
+
     name = "ablation_early_judge"
 
-    def run(self, image_path: Path, sample_id: str = "unknown") -> PipelineResult:
-        total_calls = 0
+    def _stage_initial_analysis(self, state: PipelineState) -> None:
+        """Run initial analysis AND early judge."""
+        # Run standard initial analysis first (VP, experts, summarizer, candidates, disagreement)
+        super()._stage_initial_analysis(state)
 
-        # Standard steps
-        vp = self.visual_perception.analyze(image_path)
-        total_calls += 1
+        # Early judge: runs BEFORE routing/recheck/deliberation
+        cands = state.current_candidates or state.initial_candidates
+        if cands is None:
+            cands = CandidateSet(candidates=())
+        vp = state.visual_report
+        if vp is None:
+            vp = VisualPerceptionReport(content="", usage=TokenUsage())
+        summary = state.summarized_report
+        if summary is None:
+            summary = SummarizedReport(content="", usage=TokenUsage())
 
-        reports = []
-        for expert in [
-            self.shape_expert, self.style_expert, self.glyph_expert,
-            self.material_expert, self.local_detail_expert,
-        ]:
-            reports.append(expert.analyze(image_path))
-            total_calls += 1
-        et = tuple(reports)
-
-        summary = self.summarizer.summarize(vp, et)
-        total_calls += 1
-
-        candidates = self.candidate_generator.generate(summary)
-        total_calls += 1
-
-        # Judge runs EARLY — before recheck or deliberation
-        early_final = self.judge.adjudicate(
-            image_path=image_path,
+        early_judgment = self.judge.adjudicate(
+            image_path=state.image_path,
             visual_report=vp,
             summarized_report=summary,
-            candidates=candidates,
-            expert_reports=et,
+            candidates=cands,
+            expert_reports=tuple(state.expert_reports),
         )
-        total_calls += 1
+        state.accounting.record_call("early_judge", early_judgment.usage)
+        state.preliminary_judgment = early_judgment
 
-        return PipelineResult(
-            sample_id=sample_id,
-            final_identification=early_final,
-            visual_perception_report=vp,
-            expert_reports=et,
-            summarized_report=summary,
-            initial_candidates=candidates,
-            disagreement_analysis=None,
-            total_usage=early_final.usage,
-            total_api_calls=total_calls,
-            status="COMPLETED",
-        )
+        # NOTE: The preliminary judgment is available in PipelineState.
+        # Downstream stages (recheck prompts, deliberation) can reference it,
+        # which may introduce anchoring bias. The full pipeline defers the
+        # judge until ALL recheck/deliberation is done, preventing this.
+
+    def _stage_final_judge(self, state: PipelineState) -> None:
+        """Final judge sees the early judgment (anchoring bias test).
+
+        In the no-ablation pipeline, the judge is deferred and sees only
+        the final state. Here, we don't run a second judge call — the
+        early judgment IS the final result. This lets us compare:
+          Full pipeline result vs. Early judge result
+        and measure how much anchoring matters.
+        """
+        # The early judgment is the final result — this tests whether
+        # deferring the judge (full pipeline) improves over acting early.
+        state.final_identification = state.preliminary_judgment

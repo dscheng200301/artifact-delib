@@ -17,7 +17,7 @@ from artifact_delib.ablations.no_disagreement_analysis import AblationNoDisagree
 from artifact_delib.ablations.no_dynamic_routing import AblationNoDynamicRouting
 from artifact_delib.ablations.random_recheck import AblationRandomRecheck
 from artifact_delib.ablations.no_controlled_deliberation import AblationNoControlledDeliberation
-from artifact_delib.ablations.free_debate import AblationFreeDebateNew
+from artifact_delib.ablations.free_debate import AblationFreeDebate
 from artifact_delib.ablations.no_critic import AblationNoCritic
 from artifact_delib.ablations.early_judge import AblationEarlyJudge
 
@@ -43,20 +43,22 @@ if _old_name not in sys.modules:
             sys.modules[_old_name] = _mod
             _spec.loader.exec_module(_mod)
 
-            # Re-export all legacy classes
-            for _name in [
-                "AblationNoMultiExpert",
-                "AblationSingleExpert",
-                "AblationNoRouter",
-                "AblationNoRecheck",
-                "AblationFixedAllRecheck",
-                "AblationNoDeliberation",
-                "AblationFreeDebate",
-                "AblationFixedDeliberation",
-                "AblationNoDeferredJudge",
-            ]:
-                if hasattr(_mod, _name):
-                    globals()[_name] = getattr(_mod, _name)
+            # Re-export legacy classes with Legacy prefix (to avoid conflicts)
+            # Old classes that have new equivalents are NOT re-exported
+            LEGACY_MAP = {
+                "AblationNoMultiExpert": "LegacyAblationNoMultiExpert",
+                "AblationSingleExpert": "LegacyAblationSingleExpert",
+                "AblationNoRouter": "LegacyAblationNoRouter",
+                "AblationNoRecheck": "LegacyAblationNoRecheck",
+                "AblationFixedAllRecheck": "LegacyAblationFixedAllRecheck",
+                "AblationNoDeliberation": "LegacyAblationNoDeliberation",
+                "AblationFreeDebate": "LegacyAblationFreeDebate",
+                "AblationFixedDeliberation": "LegacyAblationFixedDeliberation",
+                "AblationNoDeferredJudge": "LegacyAblationNoDeferredJudge",
+            }
+            for _old_name, _legacy_name in LEGACY_MAP.items():
+                if hasattr(_mod, _old_name):
+                    globals()[_legacy_name] = getattr(_mod, _old_name)
 
 __all__ = [
     "AblationNoExpertSpecialization",
@@ -64,17 +66,17 @@ __all__ = [
     "AblationNoDynamicRouting",
     "AblationRandomRecheck",
     "AblationNoControlledDeliberation",
-    "AblationFreeDebateNew",
+    "AblationFreeDebate",
     "AblationNoCritic",
     "AblationEarlyJudge",
-    # Legacy
-    "AblationNoMultiExpert",
-    "AblationSingleExpert",
-    "AblationNoRouter",
-    "AblationNoRecheck",
-    "AblationFixedAllRecheck",
-    "AblationNoDeliberation",
-    "AblationFreeDebate",
-    "AblationFixedDeliberation",
-    "AblationNoDeferredJudge",
+    # Legacy (prefixed to avoid conflict)
+    "LegacyAblationNoMultiExpert",
+    "LegacyAblationSingleExpert",
+    "LegacyAblationNoRouter",
+    "LegacyAblationNoRecheck",
+    "LegacyAblationFixedAllRecheck",
+    "LegacyAblationNoDeliberation",
+    "LegacyAblationFreeDebate",
+    "LegacyAblationFixedDeliberation",
+    "LegacyAblationNoDeferredJudge",
 ]
