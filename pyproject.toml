@@ -23,6 +23,15 @@ dependencies = [
 [project.scripts]
 artifact-delib = "artifact_delib.cli:main"
 
+[project.optional-dependencies]
+vision-baselines = [
+    "torch>=2.0",
+    "torchvision>=0.15",
+    "transformers>=4.30",
+    "timm>=0.9",
+    "scikit-learn>=1.0",
+]
+
 [tool.setuptools.packages.find]
 where = ["src"]
 

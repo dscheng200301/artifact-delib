@@ -1,0 +1,58 @@
+# Core ablation experiment matrix
+
+metadata:
+  experiment: core_ablations
+  description: "Core ablation experiments for ArtifactDelib paper"
+
+methods:
+  - name: artifact_delib_rule
+    label: Full ArtifactDelib
+    description: Complete pipeline with specialized experts, disagreement analysis, dynamic routing, controlled deliberation
+
+  - name: ablation_no_expert_specialization
+    label: w/o Expert Specialization
+    description: Five identical general experts instead of specialized
+
+  - name: ablation_no_disagreement_analysis
+    label: w/o Candidate-Disagreement Analysis
+    description: Margin-only routing, no semantic disagreement analysis
+
+  - name: ablation_no_dynamic_routing
+    label: w/o Dynamic Routing
+    description: Fixed full path for all samples (VP + 5 experts + all rechecks + deliberation + judge)
+
+  - name: ablation_random_recheck
+    label: Random Recheck
+    description: Random expert selection instead of targeted recheck (3 seeds: 42, 123, 2026)
+
+  - name: ablation_no_controlled_deliberation
+    label: w/o Controlled Deliberation
+    description: Skip deliberation, go to Judge directly
+
+  - name: ablation_free_debate
+    label: Free Debate
+    description: Unstructured debate instead of controlled hypothesis-critic
+
+  - name: ablation_no_critic
+    label: w/o Critic
+    description: Hypothesis A+B only, no CriticAgent
+
+  - name: ablation_early_judge
+    label: Early Judge
+    description: Judge before recheck/deliberation
+
+run_config:
+  model: qwen3.5-flash-2026-02-23
+  model_revision: latest
+  seed: 42
+  seeds_random: [42, 123, 2026]
+  image_size: [224, 224]
+  max_output_tokens: 512
+  temperature: 0.0
+  dataset_manifest: data/artifact/met_artifact_manifest.csv
+  split_manifest: data/artifact/splits/
+  cache_dir: data/cache/
+  output_dir: results/core_ablations/
+  allow_remote_calls: false
+  allow_model_download: false
+  mock_mode: true

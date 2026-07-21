@@ -4,241 +4,337 @@
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 [![Python 3.12+](https://img.shields.io/badge/Python-3.12+-blue.svg)](pyproject.toml)
-[![Tests](https://img.shields.io/badge/Tests-121%20passing-brightgreen.svg)](tests/)
 
 基于候选分歧驱动动态多专家协作的古代文物细粒度识别系统。
 
 ---
 
-## Overview
+## 一、项目核心流程
 
-ArtifactDelib is a **dynamic multi-expert deliberation framework** for fine-grained visual recognition of ancient Chinese artifacts. Instead of relying on a single VLM call or a fixed set of expert analyses, it adaptively allocates computational resources based on the **disagreement pattern among top-K candidates**.
-
-The system is designed around three core innovations:
-
-1. **Multi-Expert Visual Understanding** — Five specialized experts (Shape, Style, Glyph, Material, Local Detail) analyze the artifact image from complementary perspectives, producing natural-language reports.
-
-2. **Disagreement-Driven Dynamic Routing** — After expert reports are summarized into top-K candidate predictions, a **DisagreementAnalyzer** identifies the type of disagreement (e.g., shape confusion vs. style confusion), and a **RuleRouter** decides the optimal action:
-   - **FAST** → Direct judge if confident
-   - **Targeted Recheck** → Route to the single most relevant expert for re-examination
-   - **DELIBERATION** → Trigger controlled hypothesis-level debate when candidates are closely contested
-
-3. **Controlled Deliberation + Deferred Judgment** — For hard samples, a HypothesisAgent argues for Top-1 vs. Top-2 candidates while a CriticAgent refutes, followed by a final judge that renders the decision with full context.
-
-## Pipeline
+主方法 `ArtifactDelib-Rule` 由以下组件构成：
 
 ```
-                        ┌──────────────────────┐
-                        │    Input Image        │
-                        └──────────┬───────────┘
-                                   ▼
-                        ┌──────────────────────┐
-                        │  Visual Perception    │
-                        └──────────┬───────────┘
-                                   ▼
-            ┌───────────────────────────────────┐
-            │   Five Specialized Experts       │
-            │  ┌─────┐ ┌────┐ ┌─────┐ ┌─────┐┌──────┐│
-            │  │Shape│ │Style││Glyph│ │Mat. ││Detail││
-            │  └─────┘ └────┘ └─────┘ └─────┘└──────┘│
-            └──────────────────┬────────────────────┘
-                               ▼
-            ┌──────────────────────────────────────┐
-            │         Report Summarizer             │
-            └──────────────────┬───────────────────┘
-                               ▼
-            ┌──────────────────────────────────────┐
-            │     Top-K Candidate Generation        │
-            └──────────────────┬───────────────────┘
-                               ▼
-            ┌──────────────────────────────────────┐
-            │     Disagreement Analyzer             │
-            │     + RuleRouter                      │
-            └────────────┬─────────────┬───────────┘
-                         │             │
-              ┌──────────┘             └──────────┐
-              ▼                                    ▼
-    ┌──────────────────┐              ┌──────────────────────┐
-    │   FAST           │              │ Needs Recheck        │
-    │ → ArtifactJudge  │              │ → Targeted Expert    │
-    └──────────────────┘              │ → Re-summarizer      │
-                                      │ → Re-route           │
-                                      └──────────┬───────────┘
-                                                 │
-                                       ┌─────────┴─────────┐
-                                       ▼                   ▼
-                            ┌──────────────────┐  ┌──────────────────┐
-                            │  DELIBERATION    │  │  FAST (re-route) │
-                            │ Hypothesis A/B   │  │ → ArtifactJudge  │
-                            │ + Critic Debate  │  └──────────────────┘
-                            │ → ArtifactJudge  │
-                            └──────────────────┘
-                                      │
-                                      ▼
-                        ┌──────────────────────┐
-                        │  Final Identification │
-                        └──────────────────────┘
+Input Artifact Image
+→ VisualPerception
+→ Five Specialized Experts
+→ ReportSummarizer
+→ Top-K CandidateGenerator
+→ DisagreementAnalyzer
+→ Dynamic Router
+    ├── FAST
+    ├── Targeted Expert Recheck
+    └── Controlled Deliberation
+→ Deferred ArtifactJudge
+→ Final Identification
 ```
 
-## Baselines & Ablations
+### 五个专家
 
-The framework is evaluated against a comprehensive suite of baselines and ablations.
+1. **Shape Expert** — 器形分析
+2. **Style Expert** — 纹饰与艺术风格分析
+3. **Glyph Expert** — 铭文款识分析
+4. **Material & Craft Expert** — 材质与工艺分析
+5. **Local Detail Expert** — 局部细节分析
 
-### Baselines (B1–B5)
+### 测试阶段约束
 
-| ID | Method | Description | Purpose |
-|----|--------|-------------|---------|
-| B1 | **DirectVLM** | Single VLM call, no experts | Baseline lower bound |
-| B2 | **FixedMultiExpert** | All 5 experts always called, no routing | Prove dynamic routing value |
-| B3 | **GenericMAD** | N-agent free-form debate with rounds | Prove controlled deliberation value |
-| B4 | **FixedFull** | All experts + all rechecks + deliberation | Upper bound on cost |
-| B5 | **ArtifactDelib-Rule** | Full system with RuleRouter | **Proposed method** |
+测试阶段输入只能是图片。禁止向模型提供：测试标签、文物标题、馆藏说明、博物馆描述、年代元数据、文件名中的类别、数据集说明文本、对应对象 ID、任何能够直接泄露答案的信息。真实标签只能用于离线评价。
 
-### Ablations (A1–A12)
+---
+
+## 二、实验体系
+
+项目实验体系分为两个部分：
+
+1. **外部基线实验（External Baselines）** — 与已有方法的对比
+2. **核心消融实验（Core Ablations）** — ArtifactDelib 自身模块的消融分析
+
+### 外部基线
+
+| ID | Method | Description |
+|----|--------|-------------|
+| B1 | CLIP Zero-Shot | CLIP 零样本图像分类 |
+| B2 | DINOv2 k-NN | 冻结 DINOv2 特征的 k-NN 检索 |
+| B3 | BLIP-2 Zero-Shot | BLIP-2 零样本图文识别 |
+| B4 | Direct Single-VLM | 单次 VLM 调用 |
+| B5 | Self-Consistency VLM | N=5 次独立 VLM 采样 + 多数投票 |
+| B6 | Multi-Agent Debate | 4 智能体 2 轮自由辩论 |
+
+加上本文方法：
+
+| O1 | **ArtifactDelib-Rule** | 完整流水线 + RuleRouter |
+| O2 | ArtifactDelib-MLP | 完整流水线 + MLPRouter（仅当 MLP 可运行时） |
+
+### 核心消融
 
 | ID | Variant | What's removed / changed |
 |----|---------|--------------------------|
-| A1 | NoMultiExpert | VP → Judge only (no experts) |
-| A2 | SingleExpert | One generic expert instead of 5 specialized |
-| A3 | NoRouter | Always all experts (like B2) |
-| A4 | NoRecheck | Router can't request re-examination |
-| A5 | NoDeliberation | Router can't trigger debate; goes straight to judge |
-| A6 | NoDeferredJudge | Judge decides immediately, no deliberation context |
-| A7 | FixedAllRecheck | Always recheck all 5 experts (like B4) |
-| A8 | FixedDeliberation | Always run deliberation |
-| A9 | FreeDebate | Unstructured debate vs. controlled hypothesis-critic |
-| A10–A12 | *(additional routing/deliberation variants)* | |
+| A1 | w/o Expert Specialization | 五个专家使用相同通用 Prompt |
+| A2 | w/o Disagreement Analysis | 仅使用置信度 margin 路由 |
+| A3 | w/o Dynamic Routing | 所有样本执行固定完整路径 |
+| A4 | Random Recheck | 随机专家取代定向重审（3 种子） |
+| A5 | w/o Controlled Deliberation | 困难样本跳过协商 |
+| A6 | Free Debate | 自由讨论取代受控假设协商 |
+| A7 | w/o Critic | 仅 Hypothesis A+B，无 CriticAgent |
+| A8 | Early Judge | Judge 在重审前即作出裁决 |
 
-Ablations are implemented in [`src/artifact_delib/ablations.py`](src/artifact_delib/ablations.py).
+### 暂缓基线
 
-## Learned Router
+```text
+AutoGen and CAMEL are deferred to a future experimental phase.
+Deferred baselines: AutoGen and CAMEL are intentionally not
+implemented in the current experimental phase.
+```
 
-Building on the RuleRouter, the framework also includes a **Learned Router** pipeline:
+**不安装 `autogen` 或 `camel-ai`，不加入实验矩阵，不创建伪实现。**
 
-1. **OracleRouteBuilder** — Runs the full pipeline on training samples, extracts route features (top-K confidences, margin, disagreement type, candidate count), and scores every possible route action against ground truth to determine the optimal (oracle) route.
-2. **MLPRouter** — A lightweight multi-layer perceptron trained on the oracle dataset to predict the optimal route from features alone, enabling data-driven routing decisions at inference time.
+### 旧实验重新归类
 
-Implementation in [`src/artifact_delib/router/`](src/artifact_delib/router/).
+以下方法已从外部基线表移除，重新归类为内部诊断 / 遗留消融：
 
-## Project Structure
+| 旧名称 | 新归类 | 说明 |
+|--------|--------|------|
+| FixedMultiExpert | Legacy / Internal Diagnostic | 不路由的固定 5 专家 |
+| FixedFull | Legacy / Internal Diagnostic | 始终执行全部步骤 |
+| GenericMAD | Legacy / Internal Diagnostic | 通用多 Agent 辩论（内部） |
+| NoRouter | Legacy Ablation | 固定路径 |
+| FixedAllRecheck | Legacy Ablation | 始终执行全部重审 |
+| RandomRouter / ConfidenceRouter | Legacy Ablation | 备选路由策略（已弃用） |
+| EntropyRouter / MarginRouter | Legacy Ablation | 备选路由策略（已弃用） |
+| OracleRouter | Oracle Upper Bound | 仅开发调试，不可部署 |
+
+这些类保留兼容性，但在论文主表中不出现。
+
+---
+
+## 三、项目结构
 
 ```
 artifact-delib/
 ├── src/artifact_delib/
-│   ├── agents/              # Experts, deliberation, judge modules
-│   │   ├── experts/         # 5 specialized expert agents
-│   │   └── deliberation/    # HypothesisAgent, CriticAgent, Manager
-│   ├── api/                 # Model clients (OpenAI-compatible, mock, cache, budget, retry)
-│   ├── data/                # Importer, splitter, validator, Met downloader, batch runner
-│   ├── evaluation/          # Prediction parser, metrics, experiment logger
-│   ├── models/              # Mock client for testing
-│   ├── pipeline/            # Main pipeline orchestrator
-│   ├── router/              # RuleRouter, OracleRouteBuilder, MLPRouter
-│   ├── baselines.py         # B1–B4 baselines
-│   ├── ablations.py         # A1–A12 ablation variants
-│   └── schemas.py           # Core data structures
-├── tests/                   # 121 tests across phases 2–8
-├── scripts/                 # Data download, Oracle build, router training
-├── prompts/                 # Prompt templates for agents
-└── docs/                    # Documentation
+│   ├── agents/                  # 专家、协商、Judge 模块
+│   │   ├── experts/             # 5 个专项专家 Agent
+│   │   ├── deliberation/        # HypothesisAgent, CriticAgent, Manager
+│   │   └── structured_report.py # 专家混合输出格式解析
+│   ├── baselines/               # 外部基线实现
+│   │   ├── direct_vlm.py        # Direct Single-VLM
+│   │   ├── self_consistency.py  # Self-Consistency VLM
+│   │   ├── multi_agent_debate.py # Multi-Agent Debate
+│   │   ├── clip_zero_shot.py    # CLIP Zero-Shot（存根）
+│   │   ├── dinov2_knn.py        # DINOv2 k-NN（存根）
+│   │   ├── blip2_zero_shot.py   # BLIP-2 Zero-Shot（存根）
+│   │   ├── legacy.py            # 旧基线（FixedMultiExpert 等）
+│   │   ├── base.py              # BaselineProtocol
+│   │   └── registry.py          # 方法注册表
+│   ├── ablations/               # 核心消融实验
+│   │   ├── no_expert_specialization.py
+│   │   ├── no_disagreement_analysis.py
+│   │   ├── no_dynamic_routing.py
+│   │   ├── random_recheck.py
+│   │   ├── no_controlled_deliberation.py
+│   │   ├── free_debate.py
+│   │   ├── no_critic.py
+│   │   └── early_judge.py
+│   ├── ablations.py             # 向后兼容（旧 A1-A12）
+│   ├── baselines.py             # 向后兼容（旧 B1-B4）
+│   ├── api/                     # 模型客户端、Mock、缓存、预算、重试
+│   ├── data/                    # 导入、划分、验证、下载、BatchRunner
+│   ├── evaluation/              # 预测解析、指标计算、实验日志
+│   ├── pipeline/                # 主流水线编排
+│   ├── router/                  # RuleRouter, OracleRouteBuilder, MLPRouter
+│   └── schemas.py               # 核心数据结构
+├── tests/                       # 单元测试
+├── scripts/                     # 数据下载、Oracle 构建、表生成
+├── configs/                     # 实验配置文件
+│   ├── baselines/
+│   ├── ablations/
+│   └── experiments/
+├── results/                     # 实验输出目录
+│   ├── external_baselines/
+│   ├── core_ablations/
+│   ├── tables/
+│   └── figures/
+└── README.md
 ```
 
-## Installation
+---
+
+## 四、安装
 
 **Requirements:** Python 3.12+, Conda environment `histo-delib`
 
 ```bash
-# Clone
 git clone https://github.com/dscheng200301/artifact-delib.git
 cd artifact-delib
 
-# Install package
+# 核心安装
 conda run -n histo-delib pip install -e .
 
-# Run tests (121 tests)
-PYTHONPATH=src conda run -n histo-delib python -m pytest tests/ -v
+# 可选：视觉基线依赖
+conda run -n histo-delib pip install -e ".[vision-baselines]"
 ```
 
-### Dependencies
-- **Core:** pydantic, httpx, Pillow
-- **Utilities:** PyYAML, Jinja2, filelock
+### 依赖分组
 
-## Dataset
+- **Core:** pydantic, httpx, Pillow, PyYAML, Jinja2, filelock
+- **Vision Baselines (可选):** torch, transformers, timm, scikit-learn
 
-The system is designed for [Met Museum Open Access](https://github.com/metmuseum/openaccess) (CC0 licensed) Chinese artifacts, covering 10+ categories:
+普通安装不会被迫安装大型视觉依赖。
 
-| Category | Target |
-|----------|--------|
-| Ceramics (瓷器) | 1,500 |
-| Jade (玉器) | 1,200 |
-| Paintings (绘画) | 800 |
-| Metalwork (金属器) | 800 |
-| Textiles (纺织品) | 800 |
-| Snuff Bottles (鼻烟壶) | 400 |
-| Sculpture (雕塑) | 300 |
-| Tomb Pottery (陶俑) | 250 |
-| Lacquer (漆器) | 200 |
-| Calligraphy (书法) | 130 |
-| Enamels (珐琅/景泰蓝) | 20 |
-| **Total** | **~6,400** |
+---
 
-```python
-from pathlib import Path
-from artifact_delib.data import MetDownloader, ArtifactDatasetSplitter
-import asyncio
+## 五、运行实验
 
-# Download up to 500 Met artifacts
-downloader = MetDownloader(Path("data/artifact"), max_objects=500, concurrency=20)
-samples = asyncio.run(downloader.run())
+### Mock 模式（不调用付费 API）
 
-# Split 70/10/20
-splitter = ArtifactDatasetSplitter(train_ratio=0.7, validation_ratio=0.1)
-splits = splitter.split(samples)
-```
-
-To run the full download (6,400 images, ~75 min with rate limiting):
 ```bash
-PYTHONPATH=src python scripts/download_met_images.py
+# 运行所有单元测试
+PYTHONPATH=src conda run -n histo-delib python -m pytest tests/ -v
+
+# 生成结果表骨架（无实验数据）
+conda run -n histo-delib python scripts/generate_tables.py
 ```
 
-## Running Experiments
+### 真实实验（需要授权和 API Key）
 
-```python
-from artifact_delib.data.batch_runner import BatchRunner
-from artifact_delib.pipeline.artifact_delib_pipeline import ArtifactDelibPipeline
-from artifact_delib.data.importer import ArtifactDatasetImporter
-
-# Load dataset
-importer = ArtifactDatasetImporter(image_root=Path("data/artifact/images"))
-samples = importer.import_manifest(Path("data/artifact/met_artifact_manifest.csv"))
-
-# Load test split
-with open("data/artifact/splits/test.txt") as f:
-    test_ids = set(line.strip() for line in f if line.strip())
-test_samples = [s for s in samples if s.sample_id in test_ids]
-
-# Run B5 (full pipeline)
-runner = BatchRunner(
-    method=ArtifactDelibPipeline(),
-    output_root=Path("output/b5"),
-    experiment_id="b5_full_pipeline",
-    method_name="ArtifactDelib-Rule"
-)
-results = runner.run(test_samples)
-metrics = runner.evaluate(results, test_samples)
-print(metrics)
+```bash
+# 注意：以下命令会调用付费 API，请先确认配置
+# 修改 configs/experiments/external_baselines.yaml 中的 allow_remote_calls: true
+# 然后运行 BatchRunner
 ```
 
-## Evaluation
+**在运行真实基线前，必须确认：**
+1. API Key 已配置且不硬编码在代码中
+2. 数据集已下载到 `data/artifact/`
+3. 数据划分清单已生成
+4. 已理解实验会消耗 Token 和产生费用
+5. 模型权重下载（CLIP/DINOv2/BLIP-2）需单独授权
 
-The evaluation framework computes:
+### 未授权时禁止自动下载或远程调用
 
-- **Top-1 / Top-5 accuracy** — Fine-grained type, category, period, and joint
-- **Macro F1** — Per-class F1 weighted equally across categories
-- **Cost metrics** — Average API calls and tokens per sample
-- **Correction / Harm rates** — How often recheck or deliberation corrects (or worsens) the prediction
+项目默认 `allow_remote_calls: false` 和 `allow_model_download: false`。
+所有单元测试使用 MockClient，不调用付费 API，也不下载真实模型。
 
-## Citation
+---
+
+## 六、数据防护
+
+### 泄漏防护措施
+
+1. 文件 SHA-256 完全重复检测
+2. 感知哈希近重复检测
+3. 相同 Met object ID 分组
+4. 同一文物不同拍摄角度分组
+5. 相同馆藏编号分组
+6. 文件名标签泄漏检查
+7. 图片损坏与不可读取检查
+8. 类别样本数量统计
+9. train/validation/test 标签覆盖统计
+
+### 正式划分
+
+使用 **Object-disjoint stratified split**：
+- 同一对象的所有图片只能进入一个 split
+- 验证集用于选择 k、阈值和 Prompt
+- 测试集不得用于调参
+- split 清单落盘，后续运行复用
+- 不得每次运行重新随机划分
+
+### 当前数据状态
+
+读取实际 manifest 获取真实数量。README 不包含虚构数字。
+
+---
+
+## 七、评价指标
+
+### 识别指标
+
+- Category Accuracy
+- Artifact-Type Accuracy
+- Dynasty/Period Accuracy
+- Material Accuracy
+- Top-1 Joint Accuracy
+- Top-3 Accuracy
+- Macro-F1
+- Micro-F1
+- Parse Failure Rate
+
+### 效率指标
+
+- Average API Calls
+- Average Input/Output/Total Tokens
+- Average Latency / P50 / P95
+- Estimated Cost
+
+### 协商相关指标（仅完整方法与相关消融）
+
+- Correction Rate
+- Harm Rate
+- No-Change Rate
+- Deliberation Trigger Count
+- Average Deliberation Rounds
+
+---
+
+## 八、专家输出格式
+
+专家报告采用**自然语言 + 少量结构化控制字段**的混合格式：
+
+```json
+{
+  "expert_type": "shape",
+  "report": "完整自然语言视觉分析报告",
+  "top_candidates": [
+    {"name": "宋代青瓷碗", "confidence": 0.67},
+    {"name": "元代早期瓷碗", "confidence": 0.23}
+  ],
+  "uncertainty_focus": ["底足", "口沿"],
+  "recommended_expert": "style"
+}
+```
+
+- `report` 必须保留完整自然语言视觉理解
+- `top_candidates` 限制为 1–3 个
+- `confidence` 仅作为路由特征，不是真实概率
+- `uncertainty_focus` 用于分歧分析和定向重审
+- `recommended_expert` 仅为专家建议，Router 不直接无条件采用
+- JSON 解析失败时保留原始自然语言输出
+
+---
+
+## 九、结果
+
+### 重要声明
+
+**本 README 不包含虚构实验结果。** 所有实验数据必须在真实实验运行后才能填入。
+
+当前结果表（`results/tables/`）只包含表头和行名。数据单元格为空。
+
+### 统计方法
+
+- 确定性方法：至少运行一次，Bootstrap 95% CI
+- 随机方法：至少 3 个种子（42, 123, 2026），报告 Mean ± Std
+- 主方法与主要外部基线间支持 McNemar 检验
+- 不得只保留最好的一次运行
+
+---
+
+## 十、代码质量
+
+- Python 3.12+，类型注解完整
+- 新增类和公共函数有 docstring
+- 不硬编码 API Key
+- 不提交 `.env`
+- 普通 `pip install` 不强制安装 torch
+- 模型和特征使用 lazy loading
+- 不自动下载模型
+- 不自动执行付费实验
+- 不伪造论文结果
+
+---
+
+## 十一、引用
 
 If you use this work in your research, please cite:
 

@@ -1,0 +1,78 @@
+# External baselines experiment matrix
+# Six methods + two ArtifactDelib variants
+
+metadata:
+  experiment: external_baselines
+  description: "External baselines for ArtifactDelib paper"
+  auto_deferred: ["autogen", "camel"]
+  deferred_note: >
+    AutoGen and CAMEL are intentionally not implemented in the current
+    experimental phase. Deferred baselines: AutoGen and CAMEL are
+    intentionally not implemented in the current experimental phase.
+
+methods:
+  - name: clip_zero_shot
+    description: CLIP zero-shot image classification
+    enabled: false
+    requires_download: true
+    requires_fit: false
+    optional_deps: [torch, transformers]
+
+  - name: dinov2_knn
+    description: DINOv2 k-NN with distance-weighted voting
+    enabled: false
+    requires_download: true
+    requires_fit: true
+    optional_deps: [torch, scikit-learn]
+
+  - name: blip2_zero_shot
+    description: BLIP-2 zero-shot image-to-text
+    enabled: false
+    requires_download: true
+    requires_fit: false
+    optional_deps: [torch, transformers]
+
+  - name: direct_single_vlm
+    description: Single VLM call
+    enabled: true
+    requires_download: false
+    requires_fit: false
+
+  - name: self_consistency_vlm
+    description: N=5 VLM samples + majority vote
+    enabled: true
+    requires_download: false
+    requires_fit: false
+
+  - name: multi_agent_debate
+    description: 4 agents, 2 debate rounds
+    enabled: true
+    requires_download: false
+    requires_fit: false
+
+  - name: artifact_delib_rule
+    description: Full pipeline with RuleRouter
+    enabled: true
+    requires_download: false
+    requires_fit: false
+
+  - name: artifact_delib_mlp
+    description: Full pipeline with MLPRouter (requires training)
+    enabled: false
+    requires_download: false
+    requires_fit: true
+
+run_config:
+  model: qwen3.5-flash-2026-02-23
+  model_revision: latest
+  seed: 42
+  image_size: [224, 224]
+  max_output_tokens: 512
+  temperature: 0.0
+  dataset_manifest: data/artifact/met_artifact_manifest.csv
+  split_manifest: data/artifact/splits/
+  cache_dir: data/cache/
+  output_dir: results/external_baselines/
+  allow_remote_calls: false
+  allow_model_download: false
+  mock_mode: true
