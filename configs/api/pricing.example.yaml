@@ -1,9 +1,0 @@
-currency: CNY
-region: mainland_china
-source: https://help.aliyun.com/en/model-studio/model-pricing
-last_verified: 2026-07-18
-models:
-  qwen3.5-flash-2026-02-23:
-    input_per_million: 0.2
-    output_per_million: 2.0
-    input_max_tokens: 128000

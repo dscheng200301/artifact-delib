@@ -1,0 +1,250 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<title>ArtifactDelib Pipeline — Architecture Overview</title>
+<style>
+  body { margin: 0; padding: 24px; background: #fafafa; font-family: "Times New Roman", serif; }
+  .wrap { max-width: 1080px; margin: 0 auto; background: #fff; padding: 24px 32px 40px;
+          box-shadow: 0 1px 6px rgba(0,0,0,0.08); }
+  h1 { font-size: 18px; text-align: center; margin: 0 0 4px; letter-spacing: 0.5px; }
+  .caption { font-size: 12.5px; color: #333; text-align: justify; line-height: 1.55;
+             margin: 14px auto 0; max-width: 980px; }
+  .caption b { color: #111; }
+  svg { display: block; margin: 0 auto; }
+  .tier-label { font: 600 13px "Helvetica Neue", sans-serif; fill: #555; }
+  .box-title { font: 600 12.5px "Helvetica Neue", sans-serif; fill: #111; }
+  .box-sub   { font: 400 10.5px "Helvetica Neue", sans-serif; fill: #555; }
+  .badge { font: 600 10px "Helvetica Neue", sans-serif; fill: #fff; }
+  .legend { font: 400 11px "Helvetica Neue", sans-serif; fill: #333; }
+</style>
+</head>
+<body>
+<div class="wrap">
+<h1>Fig. X. ArtifactDelib architecture overview.</h1>
+
+<svg viewBox="0 0 1000 1180" width="1000" height="1180" xmlns="http://www.w3.org/2000/svg">
+
+  <!-- ===== Tier backgrounds ===== -->
+  <rect x="20"  y="60"  width="960" height="215" rx="6" fill="#eef6ff" stroke="#bcd7f2"/>
+  <rect x="20"  y="295" width="960" height="200" rx="6" fill="#f2fbf2" stroke="#bfe0bf"/>
+  <rect x="20"  y="515" width="960" height="520" rx="6" fill="#fff8ec" stroke="#efd8a6"/>
+  <rect x="20"  y="1055" width="960" height="105" rx="6" fill="#f6efff" stroke="#d5c3ec"/>
+
+  <text class="tier-label" x="36" y="82">Tier 1: Multi-Expert Visual Perception</text>
+  <text class="tier-label" x="36" y="317">Tier 2: Candidate Generation &amp; Disagreement Analysis</text>
+  <text class="tier-label" x="36" y="537">Tier 3: Disagreement-Driven Dynamic Routing &amp; Controlled Deliberation</text>
+  <text class="tier-label" x="36" y="1077">Tier 4: Deferred Final Judgment</text>
+
+  <!-- ===== Input ===== -->
+  <rect x="440" y="15" width="120" height="38" rx="18" fill="#3b5998" stroke="#2a4373"/>
+  <text class="box-title" x="500" y="39" text-anchor="middle" fill="#fff">Artifact Image</text>
+
+  <line x1="500" y1="53" x2="500" y2="95" stroke="#333" stroke-width="1.5" marker-end="url(#arr)"/>
+
+  <!-- ===== Tier 1 boxes ===== -->
+  <!-- VP -->
+  <rect x="400" y="95" width="200" height="44" rx="6" fill="#ffffff" stroke="#3b5998" stroke-width="1.5"/>
+  <text class="box-title" x="500" y="115" text-anchor="middle">VisualPerceptionAgent</text>
+  <text class="box-sub"   x="500" y="130" text-anchor="middle">全局视觉报告</text>
+
+  <line x1="500" y1="139" x2="500" y2="170" stroke="#333" stroke-width="1.5" marker-end="url(#arr)"/>
+
+  <!-- 5 Experts row -->
+  <g>
+    <rect x="40"  y="170" width="170" height="50" rx="6" fill="#fff" stroke="#2e8b57" stroke-width="1.5"/>
+    <text class="box-title" x="125" y="190" text-anchor="middle">ShapeExpert</text>
+    <text class="box-sub"   x="125" y="206" text-anchor="middle">器形 · 口沿/颈/肩/腹/底足</text>
+
+    <rect x="225" y="170" width="170" height="50" rx="6" fill="#fff" stroke="#2e8b57" stroke-width="1.5"/>
+    <text class="box-title" x="310" y="190" text-anchor="middle">StyleExpert</text>
+    <text class="box-sub"   x="310" y="206" text-anchor="middle">纹饰 · 兽面/夔龙/缠枝莲</text>
+
+    <rect x="410" y="170" width="170" height="50" rx="6" fill="#fff" stroke="#2e8b57" stroke-width="1.5"/>
+    <text class="box-title" x="495" y="190" text-anchor="middle">GlyphExpert</text>
+    <text class="box-sub"   x="495" y="206" text-anchor="middle">铭文 · 款识/年号/印章</text>
+
+    <rect x="595" y="170" width="175" height="50" rx="6" fill="#fff" stroke="#2e8b57" stroke-width="1.5"/>
+    <text class="box-title" x="682" y="190" text-anchor="middle">MaterialCraftExpert</text>
+    <text class="box-sub"   x="682" y="206" text-anchor="middle">材质 · 陶/瓷/青铜/玉</text>
+
+    <rect x="785" y="170" width="175" height="50" rx="6" fill="#fff" stroke="#2e8b57" stroke-width="1.5"/>
+    <text class="box-title" x="872" y="190" text-anchor="middle">LocalDetailExpert</text>
+    <text class="box-sub"   x="872" y="206" text-anchor="middle">细节 · 足底/修坯/磨损</text>
+  </g>
+
+  <!-- Lines from VP down to each expert -->
+  <line x1="500" y1="170" x2="125" y2="170" stroke="#333" stroke-width="1.2"/>
+  <line x1="125" y1="170" x2="125" y2="170" stroke="#333" stroke-width="1.5" marker-end="url(#arr)"/>
+  <line x1="500" y1="170" x2="310" y2="170" stroke="#333" stroke-width="1.2"/>
+  <line x1="310" y1="170" x2="310" y2="170" stroke="#333" stroke-width="1.5" marker-end="url(#arr)"/>
+  <line x1="500" y1="170" x2="495" y2="170" stroke="#333" stroke-width="1.2"/>
+  <line x1="495" y1="170" x2="495" y2="170" stroke="#333" stroke-width="1.5" marker-end="url(#arr)"/>
+  <line x1="500" y1="170" x2="682" y2="170" stroke="#333" stroke-width="1.2"/>
+  <line x1="682" y1="170" x2="682" y2="170" stroke="#333" stroke-width="1.5" marker-end="url(#arr)"/>
+  <line x1="500" y1="170" x2="872" y2="170" stroke="#333" stroke-width="1.2"/>
+  <line x1="872" y1="170" x2="872" y2="170" stroke="#333" stroke-width="1.5" marker-end="url(#arr)"/>
+
+  <!-- Summarizer -->
+  <line x1="125" y1="220" x2="125" y2="240" stroke="#333" stroke-width="1.2"/>
+  <line x1="872" y1="220" x2="872" y2="240" stroke="#333" stroke-width="1.2"/>
+  <line x1="125" y1="240" x2="872" y2="240" stroke="#333" stroke-width="1.2"/>
+  <line x1="500" y1="240" x2="500" y2="255" stroke="#333" stroke-width="1.5" marker-end="url(#arr)"/>
+
+  <rect x="380" y="255" width="240" height="36" rx="6" fill="#fff" stroke="#3b5998" stroke-width="1.5"/>
+  <text class="box-title" x="500" y="277" text-anchor="middle">ReportSummarizer</text>
+
+  <!-- ===== Tier 2 ===== -->
+  <line x1="500" y1="291" x2="500" y2="325" stroke="#333" stroke-width="1.5" marker-end="url(#arr)"/>
+
+  <rect x="340" y="325" width="320" height="50" rx="6" fill="#fff" stroke="#3b5998" stroke-width="1.5"/>
+  <text class="box-title" x="500" y="345" text-anchor="middle">CandidateGenerator</text>
+  <text class="box-sub"   x="500" y="361" text-anchor="middle">Top-K 候选（K=3），含置信度</text>
+
+  <line x1="500" y1="375" x2="500" y2="410" stroke="#333" stroke-width="1.5" marker-end="url(#arr)"/>
+
+  <rect x="300" y="410" width="400" height="60" rx="6" fill="#fff" stroke="#c0392b" stroke-width="1.8"/>
+  <text class="box-title" x="500" y="432" text-anchor="middle">DisagreementAnalyzer</text>
+  <text class="box-sub"   x="500" y="450" text-anchor="middle">判断分歧类型 ∈ {SHAPE, STYLE, GLYPH,</text>
+  <text class="box-sub"   x="500" y="463" text-anchor="middle">MATERIAL, LOCAL_DETAIL, MULTI_FACTOR}</text>
+
+  <!-- ===== Tier 3: Routing loop ===== -->
+  <line x1="500" y1="470" x2="500" y2="560" stroke="#333" stroke-width="1.5" marker-end="url(#arr)"/>
+
+  <!-- RuleRouter (diamond-like box) -->
+  <polygon points="500,560 680,630 500,700 320,630" fill="#fff4d6" stroke="#d35400" stroke-width="2"/>
+  <text class="box-title" x="500" y="627" text-anchor="middle">RuleRouter</text>
+  <text class="box-sub"   x="500" y="643" text-anchor="middle">7 条有序规则 · 7 类动作</text>
+
+  <!-- Branch labels -->
+  <text class="box-sub" x="150" y="585" text-anchor="middle" fill="#27ae60" font-weight="700">top1_conf≥0.60 且 margin≥0.15</text>
+  <text class="box-sub" x="850" y="585" text-anchor="middle" fill="#c0392b" font-weight="700">route_hint 指向某专家 且未 recheck</text>
+  <text class="box-sub" x="500" y="735" text-anchor="middle" fill="#8e44ad" font-weight="700">置信不足 或 recheck 用尽</text>
+
+  <!-- FAST branch → right → down to Judge -->
+  <line x1="320" y1="630" x2="110" y2="630" stroke="#27ae60" stroke-width="2"/>
+  <line x1="110" y1="630" x2="110" y2="1090" stroke="#27ae60" stroke-width="2"/>
+  <line x1="110" y1="1090" x2="370" y2="1090" stroke="#27ae60" stroke-width="2" marker-end="url(#arrG)"/>
+  <rect x="50" y="608" width="120" height="32" rx="14" fill="#27ae60"/>
+  <text class="badge" x="110" y="629" text-anchor="middle">① FAST</text>
+
+  <!-- RECHECK branch → left → loop back up -->
+  <line x1="680" y1="630" x2="880" y2="630" stroke="#c0392b" stroke-width="2"/>
+  <line x1="880" y1="630" x2="880" y2="760" stroke="#c0392b" stroke-width="2"/>
+  <rect x="750" y="608" width="200" height="32" rx="14" fill="#c0392b"/>
+  <text class="badge" x="850" y="629" text-anchor="middle">② *_RECHECK</text>
+
+  <!-- Recheck block -->
+  <rect x="720" y="760" width="260" height="74" rx="6" fill="#fff" stroke="#c0392b" stroke-width="1.5"/>
+  <text class="box-title" x="850" y="782" text-anchor="middle">TargetedExpertRecheck</text>
+  <text class="box-sub"   x="850" y="800" text-anchor="middle">只重跑被点名的 1 个专家</text>
+  <text class="box-sub"   x="850" y="815" text-anchor="middle">判别式 prompt + 版本追踪</text>
+  <text class="box-sub"   x="850" y="828" text-anchor="middle">(previous_content → new_content)</text>
+
+  <!-- Loop arrow back up to Summarizer -->
+  <line x1="850" y1="834" x2="850" y2="870" stroke="#c0392b" stroke-width="2"/>
+  <line x1="850" y1="870" x2="955" y2="870" stroke="#c0392b" stroke-width="2"/>
+  <line x1="955" y1="870" x2="955" y2="273" stroke="#c0392b" stroke-width="2" stroke-dasharray="5,4"/>
+  <line x1="955" y1="273" x2="625" y2="273" stroke="#c0392b" stroke-width="2" stroke-dasharray="5,4" marker-end="url(#arrR)"/>
+  <text class="box-sub" x="945" y="570" text-anchor="end" fill="#c0392b" font-style="italic">重汇总 → 重生候选</text>
+  <text class="box-sub" x="945" y="585" text-anchor="end" fill="#c0392b" font-style="italic">→ 重分析分歧</text>
+
+  <!-- DELIBERATION branch → down -->
+  <line x1="500" y1="700" x2="500" y2="775" stroke="#8e44ad" stroke-width="2" marker-end="url(#arrP)"/>
+  <rect x="400" y="735" width="200" height="32" rx="14" fill="#8e44ad"/>
+  <text class="badge" x="500" y="756" text-anchor="middle">③ DELIBERATION</text>
+
+  <!-- Deliberation trio -->
+  <rect x="230" y="780" width="540" height="235" rx="6" fill="#fbf2ff" stroke="#8e44ad" stroke-width="1.5" stroke-dasharray="4,3"/>
+  <text class="tier-label" x="245" y="800" fill="#6c3483">Controlled Hypothesis-Level Deliberation (max 2 rounds)</text>
+
+  <!-- Hypothesis A -->
+  <rect x="250" y="815" width="230" height="60" rx="6" fill="#fff" stroke="#8e44ad" stroke-width="1.5"/>
+  <text class="box-title" x="365" y="837" text-anchor="middle">HypothesisAgent A</text>
+  <text class="box-sub"   x="365" y="853" text-anchor="middle">支持 Top-1 候选</text>
+  <text class="box-sub"   x="365" y="868" text-anchor="middle">决策 ∈ {MAINTAIN, REVISE, ABSTAIN}</text>
+
+  <!-- Hypothesis B -->
+  <rect x="520" y="815" width="230" height="60" rx="6" fill="#fff" stroke="#8e44ad" stroke-width="1.5"/>
+  <text class="box-title" x="635" y="837" text-anchor="middle">HypothesisAgent B</text>
+  <text class="box-sub"   x="635" y="853" text-anchor="middle">支持 Top-2 候选</text>
+  <text class="box-sub"   x="635" y="868" text-anchor="middle">决策 ∈ {MAINTAIN, REVISE, ABSTAIN}</text>
+
+  <!-- Critic -->
+  <rect x="385" y="905" width="230" height="60" rx="6" fill="#fff" stroke="#8e44ad" stroke-width="1.5"/>
+  <text class="box-title" x="500" y="927" text-anchor="middle">CriticAgent</text>
+  <text class="box-sub"   x="500" y="943" text-anchor="middle">不选赢家 · 只判是否有新判别信息</text>
+  <text class="box-sub"   x="500" y="958" text-anchor="middle">should_continue ∈ {是, 否}</text>
+
+  <!-- Deliberation Summary -->
+  <rect x="250" y="980" width="500" height="28" rx="6" fill="#fff" stroke="#8e44ad" stroke-width="1.3"/>
+  <text class="box-sub" x="500" y="999" text-anchor="middle" fill="#6c3483" font-weight="600">
+    停止条件：任一方 REVISE/ABSTAIN · 无新信息 · 达最大轮次
+  </text>
+
+  <!-- Arrows between deliberation trio -->
+  <line x1="365" y1="875" x2="460" y2="905" stroke="#8e44ad" stroke-width="1.2" marker-end="url(#arrP)"/>
+  <line x1="635" y1="875" x2="540" y2="905" stroke="#8e44ad" stroke-width="1.2" marker-end="url(#arrP)"/>
+  <line x1="500" y1="965" x2="500" y2="980" stroke="#8e44ad" stroke-width="1.2" marker-end="url(#arrP)"/>
+
+  <!-- ===== Tier 4: Judge ===== -->
+  <!-- FAST branch arrives at left of Judge; Deliberation arrives from above -->
+  <line x1="500" y1="1015" x2="500" y2="1075" stroke="#8e44ad" stroke-width="2" marker-end="url(#arrP)"/>
+
+  <rect x="370" y="1075" width="260" height="70" rx="6" fill="#fff" stroke="#6c3483" stroke-width="2"/>
+  <text class="box-title" x="500" y="1100" text-anchor="middle">ArtifactJudge (Deferred)</text>
+  <text class="box-sub"   x="500" y="1118" text-anchor="middle">看到原图 + VP + 5 专家 + 全部 recheck</text>
+  <text class="box-sub"   x="500" y="1133" text-anchor="middle">+ 协商记录 → 输出最终自然语言鉴定</text>
+
+  <!-- Output -->
+  <line x1="500" y1="1145" x2="500" y2="1170" stroke="#333" stroke-width="1.5" marker-end="url(#arr)"/>
+  <text class="box-title" x="500" y="1170" text-anchor="middle" fill="#333">
+    最终鉴定 (category, fine_grained_type, period)
+  </text>
+
+  <!-- ===== Arrow markers ===== -->
+  <defs>
+    <marker id="arr" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto">
+      <path d="M 0 0 L 10 5 L 0 10 z" fill="#333"/>
+    </marker>
+    <marker id="arrG" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto">
+      <path d="M 0 0 L 10 5 L 0 10 z" fill="#27ae60"/>
+    </marker>
+    <marker id="arrR" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto">
+      <path d="M 0 0 L 10 5 L 0 10 z" fill="#c0392b"/>
+    </marker>
+    <marker id="arrP" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto">
+      <path d="M 0 0 L 10 5 L 0 10 z" fill="#8e44ad"/>
+    </marker>
+  </defs>
+
+  <!-- ===== Legend ===== -->
+  <g transform="translate(20, 1195)">
+    <rect x="0" y="-5" width="960" height="55" fill="#f5f5f5" stroke="#ccc"/>
+    <text class="legend" x="12" y="12">流程分支：</text>
+    <line x1="85" y1="8" x2="120" y2="8" stroke="#27ae60" stroke-width="2.5"/>
+    <text class="legend" x="125" y="12">① FAST — 高置信直接判决</text>
+    <line x1="290" y1="8" x2="325" y2="8" stroke="#c0392b" stroke-width="2.5"/>
+    <text class="legend" x="330" y="12">② RECHECK — 定向重查单个专家（虚线 = 回到汇总）</text>
+    <line x1="600" y1="8" x2="635" y2="8" stroke="#8e44ad" stroke-width="2.5"/>
+    <text class="legend" x="640" y="12">③ DELIBERATION — 受控假设级协商</text>
+    <text class="legend" x="12" y="36">四大模块：Tier 1 多专家感知 · Tier 2 候选与分歧分析 · Tier 3 动态路由 + 协商 · Tier 4 延迟判决。</text>
+    <text class="legend" x="12" y="48" font-style="italic" fill="#666">
+      与 HistoVerify 对比：本框架不依赖预算训练（零训练），通过"分歧驱动"决定资源分配。
+    </text>
+  </g>
+
+</svg>
+
+<div class="caption">
+<b>Fig. X. ArtifactDelib architecture overview.</b> The framework comprises four tiers.
+<b>Tier 1</b> performs multi-expert visual perception: one VisualPerceptionAgent produces a global report, while five domain-specialized experts (Shape, Style, Glyph, MaterialCraft, LocalDetail) each generate focused observations with explicit prompt warnings against anachronistic reasoning (e.g., "a 'Da Ming Xuan De Nian Zhi' mark alone does not certify a Xuande-period authentic piece").
+<b>Tier 2</b> aggregates reports and generates the Top-K (K=3) candidate identifications; a <b>DisagreementAnalyzer</b> then classifies inter-expert分歧 into one of six route hints (SHAPE / STYLE / GLYPH / MATERIAL / LOCAL_DETAIL / MULTI_FACTOR).
+<b>Tier 3</b> is the core innovation: a <b>RuleRouter</b> with seven ordered rules maps the disagreement hint to one of seven actions — (①) FAST when confidence ≥ 0.60 and margin ≥ 0.15; (②) a targeted single-expert RECHECK that loops back through re-summarization and re-candidate generation; (③) DELIBERATION when confidence remains low or recheck budget is exhausted. The <b>Controlled Deliberation</b> module pits two HypothesisAgents (each assigned a top candidate) against each other under the supervision of a CriticAgent that judges only whether new <em>discriminative</em> information has surfaced, terminating on MAINTAIN/REVISE/ABSTAIN or after two rounds.
+<b>Tier 4</b> is a <b>deferred</b> ArtifactJudge that consumes the original image plus all accumulated evidence (perception, expert reports, recheck history, deliberation transcript) to produce the final natural-language identification.
+Unlike HistoVerify (Fig. 3), ArtifactDelib requires <em>no parameter training</em>: resource allocation is driven entirely by disagreement semantics rather than learned budget prediction.
+</div>
+
+</div>
+</body>
+</html>

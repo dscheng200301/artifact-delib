@@ -1,4 +1,0 @@
-name: smoke_api
-mode: smoke_api
-synthetic_only: true
-requires_allow_paid_calls: true

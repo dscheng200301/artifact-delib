@@ -1,5 +1,4 @@
-.env
-.venv/
+# Python
 __pycache__/
 *.py[cod]
 .pytest_cache/
@@ -11,12 +10,21 @@ build/
 dist/
 *.egg-info/
 .cache/
-outputs/
 tmp/
+
+# Data files (download separately from Met Museum Open Access)
+data/
+
+# Outputs
+outputs/
 reports/*.json
 reports/*.jsonl
-data/incoming/*
-data/processed/*
-data/fixtures/
-!data/incoming/.gitkeep
-!data/processed/.gitkeep
+
+# IDE & tools
+.vscode/
+.claude/
+.worktrees/
+
+# Environment
+.env
+.venv/

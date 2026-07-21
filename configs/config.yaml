@@ -1,6 +1,0 @@
-defaults:
-  - api: mock
-  - method: histodelib_rule
-  - run: fixture
-
-project_name: histodelib

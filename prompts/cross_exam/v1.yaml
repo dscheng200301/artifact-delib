@@ -1,8 +1,0 @@
-name: cross_exam
-version: v1
-role: critic
-max_output_tokens: 256
-temperature: 0
-response_schema: {type: object}
-system_prompt: "Ask one targeted evidence question; do not reveal hidden reasoning."
-user_template: "Risk flags: {{ risk_flags }}\nTarget: {{ target }}"

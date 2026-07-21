@@ -1,8 +1,0 @@
-name: relation_probe
-version: v1
-role: router
-max_output_tokens: 128
-temperature: 0
-response_schema: {type: object}
-system_prompt: "Return concise risk flags from two structured evidence summaries."
-user_template: "Text evidence: {{ text_evidence }}\nImage evidence: {{ image_evidence }}"

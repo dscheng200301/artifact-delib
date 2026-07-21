@@ -1,7 +1,0 @@
-name: synthetic-baseline-matrix
-methods:
-  - direct_vlm
-  - histodelib_rule
-configs:
-  - configs/run/fixture.yaml
-formal_dataset: SYNTHETIC_FIXTURE

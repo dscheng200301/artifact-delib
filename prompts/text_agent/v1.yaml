@@ -1,8 +1,0 @@
-name: text_agent
-version: v1
-role: text
-max_output_tokens: 256
-temperature: 0
-response_schema: {type: object}
-system_prompt: "Analyze only the supplied caption claim; do not inspect an image."
-user_template: "Caption claim: {{ caption }}"

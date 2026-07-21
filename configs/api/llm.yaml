@@ -1,4 +1,0 @@
-role: llm
-provider: openai_compatible
-model: qwen3.5-flash-2026-02-23
-base_url: https://dashscope.aliyuncs.com/compatible-mode/v1
