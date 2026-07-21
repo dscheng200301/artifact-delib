@@ -67,6 +67,22 @@ class EvaluationResult:
     # Interaction metrics
     correction_rate: float | None = None
     harm_rate: float | None = None
+    no_change_rate: float | None = None
+
+    # Micro-F1 (global precision/recall across all samples)
+    micro_f1_type: float | None = None
+    micro_f1_period: float | None = None
+    micro_f1_category: float | None = None
+    micro_f1_material: float | None = None
+
+    # Parse failure rate
+    parse_failure_rate: float | None = None
+
+    # Deliberation statistics
+    deliberation_trigger_rate: float | None = None
+    recheck_trigger_rate: float | None = None
+    avg_rechecks: float | None = None
+    avg_deliberation_rounds: float | None = None
 
     # Per-class detail
     per_type: dict[str, PerClassMetrics] | None = None
@@ -79,6 +95,9 @@ class EvaluationResult:
     median_tokens: float | None = None
     total_api_calls: int = 0
     average_api_calls: float | None = None
+    p50_latency_ms: float | None = None
+    p95_latency_ms: float | None = None
+    average_latency_ms: float | None = None
 
     # ── Backward-compatible aliases (legacy field names) ──
     # These map old names → Top-1 accuracy so existing code keeps working.
