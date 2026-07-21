@@ -25,6 +25,20 @@ class TokenUsage(BaseModel):
     def total_tokens(self) -> int:
         return self.input_tokens + self.output_tokens
 
+    def __add__(self, other: TokenUsage) -> TokenUsage:
+        """Create a new TokenUsage summing two usages."""
+        return TokenUsage(
+            input_tokens=self.input_tokens + other.input_tokens,
+            output_tokens=self.output_tokens + other.output_tokens,
+            total_latency_ms=self.total_latency_ms + other.total_latency_ms,
+        )
+
+    def __radd__(self, other: TokenUsage | int) -> TokenUsage:
+        """Support sum() and 0 + TokenUsage (treat 0 as empty)."""
+        if isinstance(other, int) and other == 0:
+            return self
+        return NotImplemented  # type: ignore[return-value]
+
 
 class ModelRequest(BaseModel):
     """A provider-independent request for an LLM or VLM completion."""

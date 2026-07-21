@@ -8,15 +8,15 @@ from pathlib import Path
 import pytest
 
 from artifact_delib.ablations import (
-    AblationFixedAllRecheck,
-    AblationFixedDeliberation,
+    LegacyAblationFixedAllRecheck as AblationFixedAllRecheck,
+    LegacyAblationFixedDeliberation as AblationFixedDeliberation,
     AblationFreeDebate,
-    AblationNoDeferredJudge,
-    AblationNoDeliberation,
-    AblationNoMultiExpert,
-    AblationNoRecheck,
-    AblationNoRouter,
-    AblationSingleExpert,
+    LegacyAblationNoDeferredJudge as AblationNoDeferredJudge,
+    LegacyAblationNoDeliberation as AblationNoDeliberation,
+    LegacyAblationNoMultiExpert as AblationNoMultiExpert,
+    LegacyAblationNoRecheck as AblationNoRecheck,
+    LegacyAblationNoRouter as AblationNoRouter,
+    LegacyAblationSingleExpert as AblationSingleExpert,
 )
 from artifact_delib.models.mock_artifact import ArtifactMockClient
 from artifact_delib.pipeline.artifact_delib_pipeline import ArtifactDelibPipeline

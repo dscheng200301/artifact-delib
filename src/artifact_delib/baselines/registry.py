@@ -137,6 +137,137 @@ def _check_optional_deps(name: str) -> None:
 # ── Module-level convenience ──
 BASELINE_REGISTRY = _BASELINE_REGISTRY
 
+# ── Auto-registration (lazy, runs once) ──
+_AUTO_REGISTERED = False
+
+
+def _auto_register() -> None:
+    """Populate the registry with all known baselines.
+
+    Called lazily when list_baselines() or get_baseline() is first used.
+    Torch-dependent baselines are registered if their classes can be imported;
+    if torch is not installed, they are silently skipped.
+    """
+    global _AUTO_REGISTERED
+    if _AUTO_REGISTERED:
+        return
+    _AUTO_REGISTERED = True
+
+    # External
+    from artifact_delib.baselines.direct_vlm import DirectVLMBaseline
+    register_baseline(
+        "direct_single_vlm", DirectVLMBaseline,
+        category=CAT_EXTERNAL,
+        description="Single VLM call, no expert decomposition",
+    )
+
+    from artifact_delib.baselines.self_consistency import SelfConsistencyBaseline
+    register_baseline(
+        "self_consistency_vlm", SelfConsistencyBaseline,
+        category=CAT_EXTERNAL,
+        description="N independent VLM samples + majority voting aggregation",
+    )
+
+    from artifact_delib.baselines.multi_agent_debate import MultiAgentDebateBaseline
+    register_baseline(
+        "multi_agent_debate", MultiAgentDebateBaseline,
+        category=CAT_EXTERNAL,
+        description="N-agent free-form debate with multiple rounds",
+    )
+
+    # Torch-dependent baselines — skip registration if import fails
+    try:
+        from artifact_delib.baselines.clip_zero_shot import ClipZeroShotBaseline
+        register_baseline(
+            "clip_zero_shot", ClipZeroShotBaseline,
+            category=CAT_EXTERNAL,
+            description="CLIP zero-shot image classification",
+            requires_download=True,
+        )
+    except ImportError:
+        pass
+
+    try:
+        from artifact_delib.baselines.dinov2_knn import Dinov2KNNBaseline
+        register_baseline(
+            "dinov2_knn", Dinov2KNNBaseline,
+            category=CAT_EXTERNAL,
+            description="DINOv2 k-NN with distance-weighted voting",
+            requires_fit=True,
+            requires_download=True,
+        )
+    except ImportError:
+        pass
+
+    try:
+        from artifact_delib.baselines.blip2_zero_shot import Blip2ZeroShotBaseline
+        register_baseline(
+            "blip2_zero_shot", Blip2ZeroShotBaseline,
+            category=CAT_EXTERNAL,
+            description="BLIP-2 zero-shot image-to-text identification",
+            requires_download=True,
+        )
+    except ImportError:
+        pass
+
+    # Ours
+    try:
+        from artifact_delib.pipeline.artifact_delib_pipeline import ArtifactDelibPipeline
+        register_baseline(
+            "artifact_delib_rule", ArtifactDelibPipeline,
+            category=CAT_OURS,
+            description="Full pipeline with RuleRouter",
+        )
+    except ImportError:
+        pass
+
+    try:
+        from artifact_delib.router.learned_router import MLPRouter
+        register_baseline(
+            "artifact_delib_mlp", MLPRouter,
+            category=CAT_OURS,
+            description="Full pipeline with MLPRouter (requires training)",
+            requires_fit=True,
+        )
+    except ImportError:
+        pass
+
+    # Legacy
+    from artifact_delib.baselines.legacy import (
+        FixedMultiExpertBaseline, FixedFullBaseline, GenericMADBaseline,
+    )
+    register_baseline(
+        "fixed_multi_expert", FixedMultiExpertBaseline,
+        category=CAT_LEGACY,
+        description="Always call all 5 experts, no routing",
+    )
+    register_baseline(
+        "fixed_full", FixedFullBaseline,
+        category=CAT_LEGACY,
+        description="Always run all experts + rechecks + deliberation",
+    )
+    register_baseline(
+        "generic_mad", GenericMADBaseline,
+        category=CAT_LEGACY,
+        description="Generic N-agent free debate (internal diagnostic)",
+    )
+
+
+# Override list_baselines and get_baseline to auto-register first
+_original_list = list_baselines
+_original_get = get_baseline
+
+
+def list_baselines(category: str | None = None) -> dict[str, dict[str, Any]]:
+    _auto_register()
+    return _original_list(category)
+
+
+def get_baseline(name: str, **kwargs: Any) -> Any:
+    _auto_register()
+    return _original_get(name, **kwargs)
+
+
 __all__ = [
     "BASELINE_REGISTRY",
     "CAT_EXTERNAL",

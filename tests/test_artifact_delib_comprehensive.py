@@ -228,6 +228,7 @@ def test_a8_early_judge(sample, client) -> None:
 # ═══════════════════════════════════════════════════════════════
 
 from artifact_delib.baselines.registry import (
+    CAT_ABLATION,
     CAT_EXTERNAL,
     CAT_LEGACY,
     CAT_OURS,
@@ -246,7 +247,7 @@ def test_registry_categories_exist() -> None:
 def test_register_and_get() -> None:
     """Simple registration and retrieval."""
     from artifact_delib.baselines.direct_vlm import DirectVLMBaseline
-    register_baseline("test_direct", DirectVLMBaseline, category=CAT_EXTERNAL)
+    register_baseline("test_direct", DirectVLMBaseline, category=CAT_ABLATION)
     from artifact_delib.models.mock_artifact import ArtifactMockClient
     instance = get_baseline("test_direct", client=ArtifactMockClient())
     assert instance is not None

@@ -99,13 +99,6 @@ def test_hypothesis_agent_opinion_not_empty(
         round_no=1,
     )
     assert len(result.opinion) > 20
-        opponent_confidence=0.32,
-        summarized_report=mock_summary,
-        expert_reports=mock_expert_reports,
-        recheck_reports=(),
-        round_no=1,
-    )
-    assert len(opinion) > 20
 
 
 # ═══════════════════════════════════════════════
