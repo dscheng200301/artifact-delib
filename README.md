@@ -88,6 +88,19 @@ implemented in the current experimental phase.
 
 **不安装 `autogen` 或 `camel-ai`，不加入实验矩阵，不创建伪实现。**
 
+### 外部基线实现状态
+
+| Baseline | 状态 | 依赖 |
+|----------|------|------|
+| direct_single_vlm | **完整实现** | 无额外依赖 |
+| self_consistency_vlm | **完整实现** | 无额外依赖 |
+| multi_agent_debate | **完整实现** | 无额外依赖 |
+| clip_zero_shot | **完整实现** | `torch`, `transformers` |
+| dinov2_knn | **完整实现** | `torch`, `transformers`, `scikit-learn` |
+| blip2_zero_shot | **完整实现** | `torch`, `transformers` |
+
+所有视觉基线默认 `allow_model_download=False`，不自动下载模型权重。
+
 ### 旧实验重新归类
 
 以下方法已从外部基线表移除，重新归类为内部诊断 / 遗留消融：
@@ -120,9 +133,9 @@ artifact-delib/
 │   │   ├── direct_vlm.py        # Direct Single-VLM
 │   │   ├── self_consistency.py  # Self-Consistency VLM
 │   │   ├── multi_agent_debate.py # Multi-Agent Debate
-│   │   ├── clip_zero_shot.py    # CLIP Zero-Shot（存根）
-│   │   ├── dinov2_knn.py        # DINOv2 k-NN（存根）
-│   │   ├── blip2_zero_shot.py   # BLIP-2 Zero-Shot（存根）
+│   │   ├── clip_zero_shot.py    # CLIP Zero-Shot（需可选依赖 torch）
+│   │   ├── dinov2_knn.py        # DINOv2 k-NN（需可选依赖 torch）
+│   │   ├── blip2_zero_shot.py   # BLIP-2 Zero-Shot（需可选依赖 torch）
 │   │   ├── legacy.py            # 旧基线（FixedMultiExpert 等）
 │   │   ├── base.py              # BaselineProtocol
 │   │   └── registry.py          # 方法注册表
@@ -320,7 +333,25 @@ conda run -n histo-delib python scripts/generate_tables.py
 
 ---
 
-## 十、代码质量
+## 十、Pilot 实验状态
+
+**当前正式实验尚未运行。** 所有结果表仅含表头和方法名，无实验数据。
+
+Pilot 执行命令（需要先修改 `allow_remote_calls: true`）：
+
+```bash
+PYTHONPATH=src python -m artifact_delib.cli run configs/experiments/pilot.yaml
+```
+
+Pilot 成功条件：
+- 完成率 ≥ 99%
+- Parse failure rate ≤ 5%
+- FAST / RECHECK / DELIBERATION 三类路由均出现
+- 抽查 Token Accounting 一致
+
+---
+
+## 十一、代码质量
 
 - Python 3.12+，类型注解完整
 - 新增类和公共函数有 docstring
@@ -334,7 +365,7 @@ conda run -n histo-delib python scripts/generate_tables.py
 
 ---
 
-## 十一、引用
+## 十二、引用
 
 If you use this work in your research, please cite:
 
