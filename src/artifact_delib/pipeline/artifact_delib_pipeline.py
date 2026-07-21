@@ -289,23 +289,20 @@ class ArtifactDelibPipeline:
                 for r in state.recheck_records
             ),
         )
-        # Record deliberation usage from the properly-tracked result
-        for i, _dr in enumerate(result.rounds):
+        # Record deliberation usage — each agent's usage is recorded once per round
+        for i, dr in enumerate(result.rounds):
             state.accounting.record_call(
                 f"deliberation_hypothesis_a_r{i+1}",
-                result.usage,
+                dr.hypothesis_a_usage,
             )
             state.accounting.record_call(
                 f"deliberation_hypothesis_b_r{i+1}",
-                TokenUsage(),
+                dr.hypothesis_b_usage,
             )
             state.accounting.record_call(
                 f"deliberation_critic_r{i+1}",
-                TokenUsage(),
+                dr.critic_usage,
             )
-        # Add the total deliberation usage
-        if result.usage.total_tokens > 0:
-            state.accounting.record_call("deliberation_total", result.usage)
         state.deliberation_result = result
 
     # ═══════════════════════════════════════════════════

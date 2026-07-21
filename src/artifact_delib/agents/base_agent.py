@@ -52,4 +52,10 @@ class ArtifactAgent:
                 prompt_version="v1",
             )
         )
-        return response.content, response.usage
+        # Propagate latency from the response into TokenUsage
+        usage = TokenUsage(
+            input_tokens=response.usage.input_tokens,
+            output_tokens=response.usage.output_tokens,
+            total_latency_ms=response.latency_ms,
+        )
+        return response.content, usage

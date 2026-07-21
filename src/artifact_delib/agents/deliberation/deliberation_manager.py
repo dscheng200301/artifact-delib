@@ -123,6 +123,9 @@ class DeliberationManager:
                 candidate_a_decision=out_a.decision,
                 candidate_b_decision=out_b.decision,
                 critic_feedback=critic_out.feedback,
+                hypothesis_a_usage=out_a.usage,
+                hypothesis_b_usage=out_b.usage,
+                critic_usage=critic_out.usage,
             )
             rounds.append(dr)
 

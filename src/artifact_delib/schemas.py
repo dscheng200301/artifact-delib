@@ -114,6 +114,9 @@ class DeliberationRound:
     candidate_a_decision: Literal["MAINTAIN", "REVISE", "ABSTAIN"]
     candidate_b_decision: Literal["MAINTAIN", "REVISE", "ABSTAIN"]
     critic_feedback: str
+    hypothesis_a_usage: TokenUsage = field(default_factory=TokenUsage)
+    hypothesis_b_usage: TokenUsage = field(default_factory=TokenUsage)
+    critic_usage: TokenUsage = field(default_factory=TokenUsage)
 
 
 @dataclass(frozen=True)

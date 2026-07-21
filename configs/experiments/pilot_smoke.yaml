@@ -1,0 +1,47 @@
+# Pilot Smoke Test — 20 images, 2 methods.
+# Purpose: verify pipeline plumbing before spending real API calls.
+# Only validates: input parsing, output parsing, API calls, token tracking, routing.
+
+experiment:
+  name: "pilot_smoke_001"
+  description: "20-image smoke test — validate pipeline plumbing and token accounting."
+
+dataset:
+  manifest: "data/artifact/met_artifact_manifest.csv"
+  image_root: "data/artifact/images"
+  split_file: "data/artifact/splits/test.txt"
+  max_samples: 20
+  seed: 42
+
+methods:
+  # Only two methods for smoke test
+  - direct_single_vlm
+  - artifact_delib_rule
+
+model:
+  name: "qwen3.5-flash-2026-02-23"
+
+execution:
+  allow_remote_calls: false    # Must be set to true to run
+  allow_model_download: false  # Must be set to true for vision baselines
+  max_retries: 3
+  retry_delay_s: 5
+  concurrency: 1
+
+output:
+  dir: "results/pilot_smoke"
+  save_raw_responses: true
+  save_predictions: true
+
+leakage_detection:
+  run_before_experiment: true
+  fail_on_exact_duplicate: true
+  fail_on_object_overlap: true
+  warn_on_near_duplicate: true
+  warn_on_filename_leakage: true
+
+pilot_success_criteria:
+  min_completed_rate: 0.99
+  max_parse_failure_rate: 0.05
+  require_all_route_types: false  # 20 samples may not hit all routes
+  validate_token_accounting: true

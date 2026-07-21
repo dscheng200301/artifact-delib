@@ -64,11 +64,16 @@ class RunAccounting:
         self,
         agent_name: str,
         usage: TokenUsage,
-        latency_ms: float = 0.0,
+        latency_ms: float | None = None,
         cost_usd: float = 0.0,
         cache_hit: bool = False,
     ) -> None:
-        """Record one logical model call."""
+        """Record one logical model call.
+
+        Latency is auto-detected from usage.total_latency_ms if not explicitly
+        provided. Cost is estimated at $0.002/1K input + $0.008/1K output
+        if not explicitly provided.
+        """
         self.logical_call_count += 1
         if cache_hit:
             self.cache_hits += 1
@@ -77,7 +82,17 @@ class RunAccounting:
 
         self.input_tokens += usage.input_tokens
         self.output_tokens += usage.output_tokens
-        self.total_latency_ms += latency_ms
+
+        # Use explicit latency, fall back to usage.total_latency_ms
+        actual_latency = latency_ms if latency_ms is not None else usage.total_latency_ms
+        self.total_latency_ms += actual_latency
+
+        # Auto-estimate cost if not provided
+        if cost_usd == 0.0:
+            cost_usd = (
+                usage.input_tokens * 0.002 / 1000
+                + usage.output_tokens * 0.008 / 1000
+            )
         self.estimated_cost_usd += cost_usd
 
         self.per_agent_calls[agent_name] = (
