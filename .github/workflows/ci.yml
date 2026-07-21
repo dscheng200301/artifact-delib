@@ -1,0 +1,30 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install dependencies
+        run: pip install -e .
+
+      - name: Run tests
+        run: pytest -q
+
+      - name: Lint
+        run: pip install ruff && ruff check . --output-format=github
+        continue-on-error: true
+
+      - name: Type check
+        run: pip install mypy && mypy src --ignore-missing-imports
+        continue-on-error: true

@@ -7,7 +7,7 @@ name = "artifact-delib"
 version = "0.1.0"
 description = "Candidate-disagreement-driven dynamic multi-expert deliberation for ancient artifact identification."
 readme = "README.md"
-requires-python = ">=3.12,<3.13"
+requires-python = ">=3.12"
 license = { text = "MIT" }
 authors = [{ name = "ArtifactDelib contributors" }]
 dependencies = [
