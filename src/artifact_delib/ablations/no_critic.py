@@ -9,6 +9,7 @@ This isolates the CriticAgent's contribution to the deliberation quality.
 from __future__ import annotations
 from pathlib import Path
 from artifact_delib.api.base import ModelClient
+from artifact_delib.api.schemas import TokenUsage
 from artifact_delib.constants import DEFAULT_TOP_K, MAX_DELIBERATION_ROUNDS, MAX_RECHECK_ROUNDS
 from artifact_delib.agents.deliberation.deliberation_manager import DeliberationManager
 from artifact_delib.agents.deliberation.hypothesis_agent import HypothesisAgent
@@ -45,8 +46,10 @@ class _NoCriticDeliberationManager:
         top2 = candidates.candidates[1]
 
         rounds = []
+        total_usage = TokenUsage()
+        total_calls = 0
         for rnd in range(1, self.max_rounds + 1):
-            opinion_a, decision_a = self.hypothesis_agent.argue(
+            out_a = self.hypothesis_agent.argue(
                 candidate_text=top1.text,
                 candidate_confidence=top1.confidence,
                 opponent_text=top2.text,
@@ -56,7 +59,10 @@ class _NoCriticDeliberationManager:
                 recheck_reports=recheck_reports,
                 round_no=rnd,
             )
-            opinion_b, decision_b = self.hypothesis_agent.argue(
+            total_usage += out_a.usage
+            total_calls += 1
+
+            out_b = self.hypothesis_agent.argue(
                 candidate_text=top2.text,
                 candidate_confidence=top2.confidence,
                 opponent_text=top1.text,
@@ -66,23 +72,27 @@ class _NoCriticDeliberationManager:
                 recheck_reports=recheck_reports,
                 round_no=rnd,
             )
+            total_usage += out_b.usage
+            total_calls += 1
 
             rounds.append(DeliberationRound(
                 round_no=rnd,
-                candidate_a_opinion=opinion_a,
-                candidate_b_opinion=opinion_b,
-                candidate_a_decision=decision_a,
-                candidate_b_decision=decision_b,
+                candidate_a_opinion=out_a.opinion,
+                candidate_b_opinion=out_b.opinion,
+                candidate_a_decision=out_a.decision,
+                candidate_b_decision=out_b.decision,
                 critic_feedback="(skipped - no critic)",
             ))
 
-            if decision_a == decision_b and decision_a == "MAINTAIN":
+            if out_a.decision == out_b.decision and out_a.decision == "MAINTAIN":
                 break
 
         return DeliberationResult(
             rounds=tuple(rounds),
             stop_reason="no_critic_max_rounds" if len(rounds) >= self.max_rounds else "no_critic_consensus",
             summary=f"No-critic deliberation: {len(rounds)} round(s), no CriticAgent used.",
+            usage=total_usage,
+            total_api_calls=total_calls,
         )
 
 

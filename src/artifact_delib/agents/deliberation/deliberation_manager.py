@@ -6,12 +6,16 @@ Flow:
 3. Critic evaluates whether new discriminative info was produced
 4. If yes AND max rounds not reached AND no REVISE/ABSTAIN → repeat
 5. Otherwise → stop and return DeliberationResult
+
+Each agent call's usage is tracked in the DeliberationResult for
+auditable token accounting.
 """
 
 from __future__ import annotations
 
-from artifact_delib.agents.deliberation.critic_agent import CriticAgent
-from artifact_delib.agents.deliberation.hypothesis_agent import HypothesisAgent
+from artifact_delib.agents.deliberation.critic_agent import CriticAgent, CriticOutput
+from artifact_delib.agents.deliberation.hypothesis_agent import HypothesisAgent, HypothesisOutput
+from artifact_delib.api.schemas import TokenUsage
 from artifact_delib.constants import MAX_DELIBERATION_ROUNDS
 from artifact_delib.schemas import (
     CandidateSet,
@@ -20,14 +24,13 @@ from artifact_delib.schemas import (
     ExpertReport,
     SummarizedReport,
 )
-from artifact_delib.api.schemas import TokenUsage
 
 
 class DeliberationManager:
     """Orchestrate controlled hypothesis-level deliberation.
 
-    This is Innovation 3 from the paper: not free debate, but structured
-    hypothesis comparison with a critic judging discriminative value.
+    Returns DeliberationResult with tracked usage per round:
+      Each round = Hypothesis A (1 call) + Hypothesis B (1 call) + Critic (1 call).
     """
 
     def __init__(
@@ -50,96 +53,102 @@ class DeliberationManager:
         """Run controlled deliberation between Top-1 and Top-2 candidates."""
         c1 = candidates.top1
         c2 = candidates.top2
-        if c1 is None or c2 is None:
-            reason = "insufficient_candidates" if c1 else "no_candidates"
+        if c1 is None:
             return DeliberationResult(
-                rounds=(), stop_reason=reason, summary="只有单个候选，无需协商。",
+                rounds=(), stop_reason="no_candidates",
+                summary="没有候选，无需协商。",
+            )
+        if c2 is None:
+            return DeliberationResult(
+                rounds=(), stop_reason="insufficient_candidates",
+                summary="只有单个候选，无需协商。",
             )
 
         rounds: list[DeliberationRound] = []
-        prior_a: tuple[str, ...] = ()
-        prior_b: tuple[str, ...] = ()
-        critic_feedback: tuple[str, ...] = ()
-        total_input = 0
-        total_output = 0
+        prior_a_opinions: tuple[str, ...] = ()
+        prior_b_opinions: tuple[str, ...] = ()
+        prior_feedback: tuple[str, ...] = ()
+        total_usage = TokenUsage()
+        total_calls = 0
 
         for round_no in range(1, self.max_rounds + 1):
-            # Round n: Candidate A argues
-            opinion_a, decision_a = self.hypothesis_agent.argue(
+            # Hypothesis A
+            out_a: HypothesisOutput = self.hypothesis_agent.argue(
                 candidate_text=c1.text,
                 candidate_confidence=c1.confidence,
-                opponent_text=c2.text if c2 else "未知",
-                opponent_confidence=c2.confidence if c2 else 0.0,
+                opponent_text=c2.text,
+                opponent_confidence=c2.confidence,
                 summarized_report=summarized_report,
                 expert_reports=expert_reports,
                 recheck_reports=recheck_reports,
                 round_no=round_no,
-                prior_opinions=prior_a,
+                prior_opinions=prior_a_opinions,
             )
-            total_input += 0  # tracked inside HypothesisAgent
+            total_usage += out_a.usage
+            total_calls += 1
 
-            # Round n: Candidate B argues
-            if c2 is not None:
-                opinion_b, decision_b = self.hypothesis_agent.argue(
-                    candidate_text=c2.text,
-                    candidate_confidence=c2.confidence,
-                    opponent_text=c1.text,
-                    opponent_confidence=c1.confidence,
-                    summarized_report=summarized_report,
-                    expert_reports=expert_reports,
-                    recheck_reports=recheck_reports,
-                    round_no=round_no,
-                    prior_opinions=prior_b,
-                )
-            else:
-                opinion_b = "无对方候选"
-                decision_b = "ABSTAIN"
-
-            # Critic evaluates
-            feedback, should_continue = self.critic_agent.evaluate(
-                candidate_a_text=c1.text,
-                candidate_b_text=c2.text if c2 else "未知",
+            # Hypothesis B
+            out_b: HypothesisOutput = self.hypothesis_agent.argue(
+                candidate_text=c2.text,
+                candidate_confidence=c2.confidence,
+                opponent_text=c1.text,
+                opponent_confidence=c1.confidence,
+                summarized_report=summarized_report,
+                expert_reports=expert_reports,
+                recheck_reports=recheck_reports,
                 round_no=round_no,
-                opinion_a=opinion_a,
-                opinion_b=opinion_b,
-                decision_a=decision_a,
-                decision_b=decision_b,
-                prior_feedback=critic_feedback,
+                prior_opinions=prior_b_opinions,
             )
+            total_usage += out_b.usage
+            total_calls += 1
+
+            # Critic
+            critic_out: CriticOutput = self.critic_agent.evaluate(
+                candidate_a_text=c1.text,
+                candidate_b_text=c2.text,
+                round_no=round_no,
+                opinion_a=out_a.opinion,
+                opinion_b=out_b.opinion,
+                decision_a=out_a.decision,
+                decision_b=out_b.decision,
+                prior_feedback=prior_feedback,
+            )
+            total_usage += critic_out.usage
+            total_calls += 1
 
             dr = DeliberationRound(
                 round_no=round_no,
-                candidate_a_opinion=opinion_a,
-                candidate_b_opinion=opinion_b,
-                candidate_a_decision=decision_a,  # type: ignore[arg-type]
-                candidate_b_decision=decision_b,  # type: ignore[arg-type]
-                critic_feedback=feedback,
+                candidate_a_opinion=out_a.opinion,
+                candidate_b_opinion=out_b.opinion,
+                candidate_a_decision=out_a.decision,
+                candidate_b_decision=out_b.decision,
+                critic_feedback=critic_out.feedback,
             )
             rounds.append(dr)
 
             # Stop conditions
-            if decision_a in ("REVISE", "ABSTAIN") or decision_b in ("REVISE", "ABSTAIN"):
-                stop = f"{'A' if decision_a in ('REVISE','ABSTAIN') else 'B'} {decision_a if decision_a in ('REVISE','ABSTAIN') else decision_b}"
+            if out_a.decision in ("REVISE", "ABSTAIN") or out_b.decision in ("REVISE", "ABSTAIN"):
+                stop = f"{'A' if out_a.decision in ('REVISE','ABSTAIN') else 'B'}_conceded"
                 break
 
-            if not should_continue:
+            if not critic_out.should_continue:
                 stop = "no_new_information"
                 break
 
-            # Store for next round context
-            prior_a = prior_a + (opinion_a,)
-            prior_b = prior_b + (opinion_b,)
-            critic_feedback = critic_feedback + (feedback,)
-
+            # Store for next round
+            prior_a_opinions = prior_a_opinions + (out_a.opinion,)
+            prior_b_opinions = prior_b_opinions + (out_b.opinion,)
+            prior_feedback = prior_feedback + (critic_out.feedback,)
         else:
             stop = "max_rounds"
 
-        # Build summary
         summary = self._build_summary(rounds, stop, candidates)
         return DeliberationResult(
             rounds=tuple(rounds),
             stop_reason=stop,
             summary=summary,
+            usage=total_usage,
+            total_api_calls=total_calls,
         )
 
     def _build_summary(
@@ -148,7 +157,6 @@ class DeliberationManager:
         stop_reason: str,
         candidates: CandidateSet,
     ) -> str:
-        """Build a concise NL summary of the deliberation."""
         if not rounds:
             return "未进行协商。"
         last = rounds[-1]

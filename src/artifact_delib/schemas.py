@@ -124,8 +124,7 @@ class DeliberationResult:
     stop_reason: str
     summary: str
     usage: TokenUsage = field(default_factory=TokenUsage)
-
-
+    total_api_calls: int = 0
 @dataclass(frozen=True)
 class FinalIdentification:
     """Final natural-language identification from the deferred judge."""

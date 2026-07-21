@@ -2,12 +2,26 @@
 
 Not a free-form debater. Each hypothesis agent argues FOR one candidate,
 based strictly on the existing expert reports and visual analysis.
+
+Returns HypothesisOutput dataclass with opinion, decision, and usage for
+accurate token accounting in deliberation.
 """
 
 from __future__ import annotations
 
+from dataclasses import dataclass, field
+
 from artifact_delib.agents.base_agent import ArtifactAgent
-from artifact_delib.schemas import CandidateSet, ExpertReport, SummarizedReport
+from artifact_delib.api.schemas import TokenUsage
+from artifact_delib.schemas import ExpertReport, SummarizedReport
+
+
+@dataclass(frozen=True)
+class HypothesisOutput:
+    """Output from a HypothesisAgent — opinion + decision + usage."""
+    opinion: str
+    decision: str  # MAINTAIN, REVISE, or ABSTAIN
+    usage: TokenUsage = field(default_factory=TokenUsage)
 
 
 class HypothesisAgent(ArtifactAgent):
@@ -31,11 +45,11 @@ class HypothesisAgent(ArtifactAgent):
         recheck_reports: tuple[ExpertReport, ...],
         round_no: int,
         prior_opinions: tuple[str, ...] = (),
-    ) -> tuple[str, str]:
-        """Argue for the assigned candidate and return (opinion, decision).
+    ) -> HypothesisOutput:
+        """Argue for the assigned candidate and return HypothesisOutput.
 
         Returns:
-            (opinion_text, decision) where decision is MAINTAIN/REVISE/ABSTAIN.
+            HypothesisOutput with opinion text, decision tag, and usage.
         """
         system = (
             f"你是古代文物鉴定专家。当前需要进行受控假设级协商。\n\n"
@@ -56,7 +70,11 @@ class HypothesisAgent(ArtifactAgent):
         )
         content, usage = self._call(system, evidence, max_output_tokens=512)
         decision = self._extract_decision(content)
-        return content.strip(), decision
+        return HypothesisOutput(
+            opinion=content.strip(),
+            decision=decision,
+            usage=usage,
+        )
 
     def _build_evidence(
         self,

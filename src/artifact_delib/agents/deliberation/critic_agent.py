@@ -2,11 +2,25 @@
 
 The critic judges whether the current round of deliberation has produced
 any genuinely new evidence or reasoning that helps distinguish the candidates.
+
+Returns CriticOutput dataclass with feedback, should_continue flag, and usage
+for accurate token accounting.
 """
 
 from __future__ import annotations
 
+from dataclasses import dataclass, field
+
 from artifact_delib.agents.base_agent import ArtifactAgent
+from artifact_delib.api.schemas import TokenUsage
+
+
+@dataclass(frozen=True)
+class CriticOutput:
+    """Output from a CriticAgent — feedback + continue flag + usage."""
+    feedback: str
+    should_continue: bool
+    usage: TokenUsage = field(default_factory=TokenUsage)
 
 
 class CriticAgent(ArtifactAgent):
@@ -29,12 +43,11 @@ class CriticAgent(ArtifactAgent):
         decision_a: str,
         decision_b: str,
         prior_feedback: tuple[str, ...] = (),
-    ) -> tuple[str, bool]:
+    ) -> CriticOutput:
         """Evaluate one deliberation round.
 
         Returns:
-            (feedback_text, should_continue)
-            should_continue=True means there is new information worth another round.
+            CriticOutput with feedback, should_continue, and usage.
         """
         system = (
             "你是古代文物鉴定协商过程的评估专家（Critic）。\n\n"
@@ -65,7 +78,11 @@ class CriticAgent(ArtifactAgent):
 
         content, usage = self._call(system, user, max_output_tokens=256)
         should_continue = self._extract_continue(content)
-        return content.strip(), should_continue
+        return CriticOutput(
+            feedback=content.strip(),
+            should_continue=should_continue,
+            usage=usage,
+        )
 
     def _extract_continue(self, content: str) -> bool:
         """Extract whether to continue from the response."""

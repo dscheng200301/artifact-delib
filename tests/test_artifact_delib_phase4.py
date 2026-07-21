@@ -61,13 +61,13 @@ def mock_expert_reports():
     )
 
 
-def test_hypothesis_agent_returns_opinion_and_decision(
+def test_hypothesis_agent_returns_output(
     hypothesis_agent: HypothesisAgent,
     mock_summary: SummarizedReport,
     mock_expert_reports: tuple[ExpertReport, ...],
 ) -> None:
-    """HypothesisAgent should return (opinion, decision) tuple."""
-    opinion, decision = hypothesis_agent.argue(
+    """HypothesisAgent should return HypothesisOutput with opinion and decision."""
+    result = hypothesis_agent.argue(
         candidate_text="明永乐青花梅瓶",
         candidate_confidence=0.48,
         opponent_text="明宣德青花梅瓶",
@@ -77,8 +77,9 @@ def test_hypothesis_agent_returns_opinion_and_decision(
         recheck_reports=(),
         round_no=1,
     )
-    assert opinion
-    assert decision in ("MAINTAIN", "REVISE", "ABSTAIN")
+    assert result.opinion
+    assert result.decision in ("MAINTAIN", "REVISE", "ABSTAIN")
+    assert result.usage is not None
 
 
 def test_hypothesis_agent_opinion_not_empty(
@@ -87,10 +88,17 @@ def test_hypothesis_agent_opinion_not_empty(
     mock_expert_reports: tuple[ExpertReport, ...],
 ) -> None:
     """Opinion text should not be empty."""
-    opinion, _ = hypothesis_agent.argue(
+    result = hypothesis_agent.argue(
         candidate_text="明永乐青花梅瓶",
         candidate_confidence=0.48,
         opponent_text="明宣德青花梅瓶",
+        opponent_confidence=0.32,
+        summarized_report=mock_summary,
+        expert_reports=mock_expert_reports,
+        recheck_reports=(),
+        round_no=1,
+    )
+    assert len(result.opinion) > 20
         opponent_confidence=0.32,
         summarized_report=mock_summary,
         expert_reports=mock_expert_reports,
@@ -104,11 +112,11 @@ def test_hypothesis_agent_opinion_not_empty(
 #  CriticAgent tests
 # ═══════════════════════════════════════════════
 
-def test_critic_agent_returns_feedback_and_continue_flag(
+def test_critic_agent_returns_output(
     critic_agent: CriticAgent,
 ) -> None:
-    """Critic should return (feedback, should_continue)."""
-    feedback, should_continue = critic_agent.evaluate(
+    """Critic should return CriticOutput with feedback, should_continue, usage."""
+    result = critic_agent.evaluate(
         candidate_a_text="明永乐青花梅瓶",
         candidate_b_text="明宣德青花梅瓶",
         round_no=1,
@@ -117,8 +125,9 @@ def test_critic_agent_returns_feedback_and_continue_flag(
         decision_a="MAINTAIN",
         decision_b="MAINTAIN",
     )
-    assert feedback
-    assert isinstance(should_continue, bool)
+    assert result.feedback
+    assert isinstance(result.should_continue, bool)
+    assert result.usage is not None
 
 
 # ═══════════════════════════════════════════════
