@@ -295,11 +295,23 @@ class ArtifactMetrics:
         evaluations: list[SampleEvaluation],
         token_counts: list[int] | None = None,
         api_calls: list[int] | None = None,
+        latencies_ms: list[float] | None = None,
+        recheck_counts: list[int] | None = None,
+        deliberation_rounds: list[int] | None = None,
+        triggered_recheck: int = 0,
+        triggered_deliberation: int = 0,
     ) -> EvaluationResult:
         """Aggregate sample evaluations into summary metrics.
 
-        Returns Top-1 / Top-3 / Top-5 accuracy, per-class P/R/F1, macro-F1,
-        correction/harm rates, and cost metrics.
+        Args:
+            evaluations: Per-sample evaluation results.
+            token_counts: Total tokens per sample (input+output).
+            api_calls: API calls per sample.
+            latencies_ms: Total latency in milliseconds per sample.
+            recheck_counts: Number of rechecks per sample.
+            deliberation_rounds: Number of deliberation rounds per sample.
+            triggered_recheck: Count of samples that triggered a recheck.
+            triggered_deliberation: Count of samples that triggered deliberation.
         """
         n = len(evaluations)
         if n == 0:
@@ -364,6 +376,51 @@ class ArtifactMetrics:
         macro_p_period = _macro(per_period, "precision")
         macro_r_period = _macro(per_period, "recall")
 
+        # ── Micro-F1 (global P/R across all samples) ──
+        micro_f1_type = self._compute_micro_f1(
+            evaluations,
+            pred_fn=lambda e: e.predicted_type,
+            gold_fn=lambda e: e.gold_type,
+        )
+        micro_f1_period = self._compute_micro_f1(
+            evaluations,
+            pred_fn=lambda e: e.predicted_period,
+            gold_fn=lambda e: e.gold_period,
+        )
+        micro_f1_category = self._compute_micro_f1(
+            evaluations,
+            pred_fn=lambda e: e.predicted_category,
+            gold_fn=lambda e: e.gold_category,
+        )
+        micro_f1_material = self._compute_micro_f1(
+            evaluations,
+            pred_fn=lambda e: e.predicted_material,
+            gold_fn=lambda e: e.gold_material,
+        )
+
+        # ── Parse failure rate ──
+        parse_failures = sum(
+            1 for e in evaluations
+            if e.predicted_type is None and e.predicted_category is None
+            and e.predicted_period is None and e.predicted_material is None
+        )
+        parse_failure_rate = parse_failures / n if n else None
+
+        # ── No-change rate ──
+        changed = sum(1 for e in evaluations if e.corrected or e.harmed)
+        no_change_rate = (n - changed) / n if n else None
+
+        # ── Latency percentiles ──
+        avg_lat_ms = sum(latencies_ms) / len(latencies_ms) if latencies_ms else None
+        p50_lat_ms = _percentile(latencies_ms, 50) if latencies_ms else None
+        p95_lat_ms = _percentile(latencies_ms, 95) if latencies_ms else None
+
+        # ── Deliberation / recheck stats ──
+        avg_rechecks = sum(recheck_counts) / len(recheck_counts) if recheck_counts else None
+        avg_delib = sum(deliberation_rounds) / len(deliberation_rounds) if deliberation_rounds else None
+        recheck_trigger_rate = triggered_recheck / n if n else None
+        deliberation_trigger_rate = triggered_deliberation / n if n else None
+
         # ── Cost ──
         avg_tokens = sum(token_counts) / len(token_counts) if token_counts else None
         med_tokens = float(median(token_counts)) if token_counts else None
@@ -392,6 +449,16 @@ class ArtifactMetrics:
             macro_recall_period=macro_r_period,
             correction_rate=correction_rate,
             harm_rate=harm_rate,
+            no_change_rate=no_change_rate,
+            micro_f1_type=micro_f1_type,
+            micro_f1_period=micro_f1_period,
+            micro_f1_category=micro_f1_category,
+            micro_f1_material=micro_f1_material,
+            parse_failure_rate=parse_failure_rate,
+            deliberation_trigger_rate=deliberation_trigger_rate,
+            recheck_trigger_rate=recheck_trigger_rate,
+            avg_rechecks=avg_rechecks,
+            avg_deliberation_rounds=avg_delib,
             per_type=per_type or None,
             per_period=per_period or None,
             per_category=per_cat or None,
@@ -400,6 +467,9 @@ class ArtifactMetrics:
             median_tokens=med_tokens,
             total_api_calls=sum(api_calls) if api_calls else 0,
             average_api_calls=avg_api,
+            p50_latency_ms=p50_lat_ms,
+            p95_latency_ms=p95_lat_ms,
+            average_latency_ms=avg_lat_ms,
         )
 
     @staticmethod
@@ -454,3 +524,58 @@ class ArtifactMetrics:
                 support=support,
             )
         return result
+
+    @staticmethod
+    def _compute_micro_f1(
+        evaluations: list[SampleEvaluation],
+        pred_fn,
+        gold_fn,
+    ) -> float | None:
+        """Compute micro-F1 from global TP/FP/FN counts.
+
+        Micro-F1 = 2 * micro_P * micro_R / (micro_P + micro_R)
+          where micro_P = sum(TP) / sum(TP + FP)
+                micro_R = sum(TP) / sum(TP + FN)
+        """
+        total_tp = total_fp = total_fn = 0
+        all_classes: set[str] = set()
+        for e in evaluations:
+            p = pred_fn(e)
+            g = gold_fn(e)
+            if p:
+                all_classes.add(p)
+            if g:
+                all_classes.add(g)
+
+        if not all_classes:
+            return None
+
+        for cls in all_classes:
+            for e in evaluations:
+                p = pred_fn(e)
+                g = gold_fn(e)
+                if p == cls and g == cls:
+                    total_tp += 1
+                elif p == cls and g != cls:
+                    total_fp += 1
+                elif p != cls and g == cls:
+                    total_fn += 1
+
+        micro_p = total_tp / (total_tp + total_fp) if (total_tp + total_fp) else 0.0
+        micro_r = total_tp / (total_tp + total_fn) if (total_tp + total_fn) else 0.0
+        if micro_p + micro_r == 0:
+            return 0.0
+        return 2 * micro_p * micro_r / (micro_p + micro_r)
+
+
+def _percentile(values: list[float] | None, p: float) -> float | None:
+    """Compute the p-th percentile of a list of values."""
+    if not values:
+        return None
+    sorted_vals = sorted(values)
+    k = (len(sorted_vals) - 1) * p / 100.0
+    f = int(k)
+    c = k - f
+    if f + 1 < len(sorted_vals):
+        return sorted_vals[f] + c * (sorted_vals[f + 1] - sorted_vals[f])
+    return sorted_vals[f]

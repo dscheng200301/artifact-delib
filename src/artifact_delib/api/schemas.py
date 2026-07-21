@@ -18,6 +18,7 @@ class TokenUsage(BaseModel):
 
     input_tokens: int = Field(default=0, ge=0)
     output_tokens: int = Field(default=0, ge=0)
+    total_latency_ms: float = Field(default=0.0, ge=0.0)
 
     @computed_field(return_type=int)  # type: ignore[prop-decorator]
     @property
