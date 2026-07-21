@@ -1,0 +1,70 @@
+# Pilot Experiment Configuration
+# Only 100 samples, fixed test subset.
+# Run with: (do NOT run without explicit authorization)
+#   python -m artifact_delib.cli run configs/experiments/pilot.yaml
+
+experiment:
+  name: "pilot_001"
+  description: "Pilot validation run — 100 samples, selected methods only."
+
+dataset:
+  manifest: "data/artifact/met_artifact_manifest.csv"
+  image_root: "data/artifact/images"
+  split_file: "data/artifact/splits/test.txt"
+  max_samples: 100
+  seed: 42
+
+methods:
+  # Only run these four methods in the pilot
+  - direct_single_vlm
+  - self_consistency_vlm
+  - multi_agent_debate
+  - artifact_delib_rule
+
+  # NOT in pilot:
+  # - clip_zero_shot (requires optional vision deps)
+  # - dinov2_knn  (requires optional vision deps)
+  # - blip2_zero_shot (requires optional vision deps)
+  # - artifact_delib_mlp (requires trained MLP weights)
+  # - All A1-A8 ablations (run after pilot validates the pipeline)
+
+model:
+  name: "qwen3.5-flash-2026-02-23"
+  # For pilot, use the fastest available model
+
+execution:
+  allow_remote_calls: false    # MUST be explicitly set to true to run
+  allow_model_download: false  # MUST be explicitly set to true to run
+  max_retries: 3
+  retry_delay_s: 5
+  concurrency: 1  # Sequential for pilot (debug-friendly)
+
+output:
+  dir: "results/pilot"
+  save_raw_responses: true
+  save_predictions: true
+  save_metrics: true
+  save_failures: true
+
+accounting:
+  track_tokens: true
+  track_latency: true
+  track_cost: true
+  distinguish_cache_hits: true
+
+leakage_detection:
+  run_before_experiment: true
+  fail_on_exact_duplicate: true
+  fail_on_object_overlap: true
+  warn_on_near_duplicate: true
+  warn_on_filename_leakage: true
+
+pilot_success_criteria:
+  min_completed_rate: 0.99
+  max_parse_failure_rate: 0.05
+  require_all_route_types: true  # FAST, RECHECK, DELIBERATION must all appear
+  validate_token_accounting: true  # Spot-check 10 samples
+
+# ── This is a DRY-RUN configuration by default ──
+# Set allow_remote_calls: true to execute real API calls
+# Set allow_model_download: true to download model weights
