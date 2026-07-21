@@ -481,81 +481,97 @@ from artifact_delib.schemas import ArtifactSample
 from artifact_delib.data.leakage_detector import LeakageDetector
 
 
-def test_detect_exact_duplicates(tmp_path) -> None:
+def test_detect_exact_duplicates() -> None:
     """Same content should be detected as duplicates."""
-    img1 = tmp_path / "a.png"
-    img2 = tmp_path / "b.png"
-    img1.write_bytes(b"same content")
-    img2.write_bytes(b"same content")
-    samples = [
-        ArtifactSample(sample_id="s1", image_path=img1),
-        ArtifactSample(sample_id="s2", image_path=img2),
-    ]
-    result = LeakageDetector.detect_exact_duplicates(samples)
-    assert len(result) == 1
-    assert "s1" in result[0].sample_ids
-    assert "s2" in result[0].sample_ids
+    import tempfile
+    with tempfile.TemporaryDirectory() as tmp:
+        tmp_path = Path(tmp)
+        img1 = tmp_path / "a.png"
+        img2 = tmp_path / "b.png"
+        img1.write_bytes(b"same content")
+        img2.write_bytes(b"same content")
+        samples = [
+            ArtifactSample(sample_id="s1", image_path=img1),
+            ArtifactSample(sample_id="s2", image_path=img2),
+        ]
+        result = LeakageDetector.detect_exact_duplicates(samples)
+        assert len(result) == 1
+        assert "s1" in result[0].sample_ids
+        assert "s2" in result[0].sample_ids
 
 
-def test_detect_exact_duplicates_different(tmp_path) -> None:
+def test_detect_exact_duplicates_different() -> None:
     """Different content should not be duplicated."""
-    img1 = tmp_path / "a.png"
-    img2 = tmp_path / "b.png"
-    img1.write_bytes(b"content one")
-    img2.write_bytes(b"content two")
-    samples = [
-        ArtifactSample(sample_id="s1", image_path=img1),
-        ArtifactSample(sample_id="s2", image_path=img2),
-    ]
-    result = LeakageDetector.detect_exact_duplicates(samples)
-    assert len(result) == 0
+    import tempfile
+    with tempfile.TemporaryDirectory() as tmp:
+        tmp_path = Path(tmp)
+        img1 = tmp_path / "a.png"
+        img2 = tmp_path / "b.png"
+        img1.write_bytes(b"content one")
+        img2.write_bytes(b"content two")
+        samples = [
+            ArtifactSample(sample_id="s1", image_path=img1),
+            ArtifactSample(sample_id="s2", image_path=img2),
+        ]
+        result = LeakageDetector.detect_exact_duplicates(samples)
+        assert len(result) == 0
 
 
-def test_detect_filename_leakage(tmp_path) -> None:
+def test_detect_filename_leakage() -> None:
     """Filename containing category keywords should be flagged."""
-    img = tmp_path / "ming_vase_001.jpg"
-    img.write_bytes(b"dummy")
-    samples = [ArtifactSample(sample_id="s1", image_path=img)]
-    result = LeakageDetector.detect_filename_leakage(samples)
-    assert len(result) >= 1
+    import tempfile
+    with tempfile.TemporaryDirectory() as tmp:
+        tmp_path = Path(tmp)
+        img = tmp_path / "ming_vase_001.jpg"
+        img.write_bytes(b"dummy")
+        samples = [ArtifactSample(sample_id="s1", image_path=img)]
+        result = LeakageDetector.detect_filename_leakage(samples)
+        assert len(result) >= 1
 
 
-def test_detect_corrupt_images(tmp_path) -> None:
+def test_detect_corrupt_images() -> None:
     """Corrupt image should be detected."""
-    img = tmp_path / "corrupt.png"
-    img.write_bytes(b"not a real image")
-    samples = [ArtifactSample(sample_id="s1", image_path=img)]
-    result = LeakageDetector.detect_corrupt_images(samples)
-    assert len(result) == 1
-    assert result[0].sample_id == "s1"
+    import tempfile
+    with tempfile.TemporaryDirectory() as tmp:
+        tmp_path = Path(tmp)
+        img = tmp_path / "corrupt.png"
+        img.write_bytes(b"not a real image")
+        samples = [ArtifactSample(sample_id="s1", image_path=img)]
+        result = LeakageDetector.detect_corrupt_images(samples)
+        assert len(result) == 1
+        assert result[0].sample_id == "s1"
 
 
-def test_compute_category_distribution(tmp_path) -> None:
+def test_compute_category_distribution() -> None:
     """Category distribution should count per-split and per-category."""
-    img1 = tmp_path / "a.png"
-    img2 = tmp_path / "b.png"
-    img1.write_bytes(b"a")
-    img2.write_bytes(b"b")
-    samples = [
-        ArtifactSample(sample_id="s1", image_path=img1, category="瓷器", split="train"),
-        ArtifactSample(sample_id="s2", image_path=img2, category="瓷器", split="train"),
-        ArtifactSample(sample_id="s3", image_path=img1, category="玉器", split="test"),
-    ]
-    dist = LeakageDetector.compute_category_distribution(samples)
-    assert len(dist) > 0
-    # Should find at least one entry
-    counts = {d.split: d.total_samples for d in dist}
-    assert counts.get("train", 0) == 2
-    assert counts.get("test", 0) == 1
+    import tempfile
+    with tempfile.TemporaryDirectory() as tmp:
+        tmp_path = Path(tmp)
+        img1 = tmp_path / "a.png"
+        img2 = tmp_path / "b.png"
+        img1.write_bytes(b"a")
+        img2.write_bytes(b"b")
+        samples = [
+            ArtifactSample(sample_id="s1", image_path=img1, category="瓷器", split="train"),
+            ArtifactSample(sample_id="s2", image_path=img2, category="瓷器", split="train"),
+            ArtifactSample(sample_id="s3", image_path=img1, category="玉器", split="test"),
+        ]
+        dist = LeakageDetector.compute_category_distribution(samples)
+        assert len(dist) > 0
+        counts = {d.split: d.total_samples for d in dist}
+        assert counts.get("train", 0) == 2
+        assert counts.get("test", 0) == 1
 
 
-def test_run_all_returns_report(tmp_path) -> None:
+def test_run_all_returns_report() -> None:
     """run_all should return a LeakageReport with all checks."""
-    img = tmp_path / "test.png"
-    img.write_bytes(b"some bytes")
-    samples = [ArtifactSample(sample_id="s1", image_path=img)]
-    report = LeakageDetector.run_all(samples)
-    assert report is not None
-    assert hasattr(report, "summary")
-    # Summary should be a string
-    assert isinstance(report.summary, str)
+    import tempfile
+    with tempfile.TemporaryDirectory() as tmp:
+        tmp_path = Path(tmp)
+        img = tmp_path / "test.png"
+        img.write_bytes(b"some bytes")
+        samples = [ArtifactSample(sample_id="s1", image_path=img)]
+        report = LeakageDetector.run_all(samples)
+        assert report is not None
+        assert hasattr(report, "summary")
+        assert isinstance(report.summary, str)

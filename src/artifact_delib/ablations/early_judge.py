@@ -17,6 +17,7 @@ from artifact_delib.pipeline.state import PipelineState
 from artifact_delib.api.schemas import TokenUsage
 from artifact_delib.schemas import (
     CandidateSet,
+    ExpertReport,
     FinalIdentification,
     SummarizedReport,
     VisualPerceptionReport,
@@ -103,7 +104,12 @@ class AblationEarlyJudge(ArtifactDelibPipeline):
             candidates=cands,
             expert_reports=tuple(state.expert_reports),
             recheck_reports=tuple(
-                r for r in state.recheck_records
+                ExpertReport(
+                    expert_name=r.expert_name,
+                    content=r.new_content,
+                    usage=r.usage,
+                )
+                for r in state.recheck_records
             ),
             deliberation_result=state.deliberation_result,
         )
